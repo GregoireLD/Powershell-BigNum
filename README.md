@@ -61,3 +61,13 @@ $val = $val.Round(999)
 $val
 ```
 
+#### Pi example calculation example
+```powershell
+$BigPi = [BigNum]4
+For($i=0 ; $i -lt 100000 ; $i++) {
+    $BigPi -= [BigNum]4/([BigNum]3+($i*4))
+    $BigPi += [BigNum]4/([BigNum]5+($i*4))
+}
+$BigPi = $BigPi.RoundDown(5)
+$BigPi
+```
