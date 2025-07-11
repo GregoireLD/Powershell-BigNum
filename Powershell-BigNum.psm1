@@ -1,7 +1,7 @@
 
 #region Classes
 
-class BigNum : System.IComparable {
+class BigNum : System.IComparable, System.IEquatable[Object] {
 
 	hidden [System.Numerics.BigInteger] $integerVal
 	hidden [System.Numerics.BigInteger] $shiftVal
@@ -140,8 +140,12 @@ class BigNum : System.IComparable {
 		return [System.Numerics.BigInteger]::Parse($this.maxDecimalResolution)
 	}
 
-	[bool] isNegative(){
+	[bool] IsNegative(){
 		return $this.negativeFlag
+	}
+
+	[bool] IsPositive(){
+		return (-not $this.negativeFlag)
 	}
 
 	#endregion Accessors
@@ -252,9 +256,9 @@ class BigNum : System.IComparable {
 	[int] CompareTo([object] $other) {
 		# Simply perform (case-insensitive) lexical comparison on the .Kind
 		# property values.
-		if ($other == $null) {return 1}
+		if ($null -eq $other) {return 1}
 
-		if ($this.Equals($other)) { return 0 }
+		if (($this.integerVal -eq $other.integerVal) -and ($this.shiftVal -eq $other.shiftVal) -and ($this.negativeFlag -eq $other.negativeFlag)) { return 0 }
 
 		[System.Numerics.BigInteger]$tmpThis = $this.integerVal
 		[System.Numerics.BigInteger]$tmpOther = $other.integerVal
@@ -283,6 +287,26 @@ class BigNum : System.IComparable {
     }
 
 	#endregion IComparable Implementation
+
+	
+	
+	#region IEquatable Implementation
+
+	[bool] Equals([object] $other) {
+		$isEqual = $true
+		if($this.integerVal -ne $other.integerVal){
+			$isEqual = $false
+		}
+		if($this.shiftVal -ne $other.shiftVal){
+			$isEqual = $false
+		}
+		if($this.negativeFlag -ne $other.negativeFlag){
+			$isEqual = $false
+		}
+		return $isEqual
+    }
+
+	#endregion IEquatable Implementation
 
 
 
@@ -391,21 +415,6 @@ class BigNum : System.IComparable {
 	# -bor    op_BitwiseOr
 	# -bnot   op_OnesComplement
 
-
-	[bool] Equals([object] $other) {
-		$isEqual = $true
-		if($this.integerVal -ne $other.integerVal){
-			$isEqual = $false
-		}
-		if($this.shiftVal -ne $other.shiftVal){
-			$isEqual = $false
-		}
-		if($this.negativeFlag -ne $other.negativeFlag){
-			$isEqual = $false
-		}
-		return $isEqual
-    }
-
 	#endregion Base Operators
 
 
@@ -421,15 +430,23 @@ class BigNum : System.IComparable {
 		return [System.Numerics.BigInteger]::Parse($strTmp.Substring(0,$lastPos))
 	}
 
-	# static [BigNum] Pow([BigNum] $value, [int] $exponent) {
-	# 	if($exponent -lt [Int32]::MaxValue ) {
-	# 		return [BigNum]::new( [System.Numerics.BigInteger]::Pow($this.integerVal,$exponent.ToInt32()) )
-	# 	}
-	# 	[System.Numerics.BigInteger] $result = $this.integerVal
-	# 	for([BigNum] $tempExp = $exponent - 1 ; $tempExp -gt 0 ; $tempExp = $tempExp - 1 ) {
-	# 		$result = $result * $this.integerVal
+	# static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
+	# 	if($exponent.IsInteger()) {
+
 	# 	}
 	# 	return [BigNum]::new([System.Numerics.BigInteger]::ModPow($this.integerVal,$exponent.val,$modulus.val))
+	# }
+
+	# hidden static [BigNum] IntPow([BigNum] $value, [BigNum] $exponent) {
+	# 	[System.Numerics.BigInteger] $tmpExp = $exponent.Int()
+
+
+	# 	return [BigNum]::new([System.Numerics.BigInteger]::ModPow($this.integerVal,$exponent.val,$modulus.val))
+	# }
+
+	# hidden static [BigNum] FloatPow([BigNum] $value, [BigNum] $exponent) {
+
+	# 	return [BigNum]::new($null,$null,$null,[BigNum]::Max($value,$exponent))
 	# }
 
 	# static [BigNum] ModPow([BigNum] $value, [int] $exponent, [System.Numerics.BigInteger] $modulus) {
@@ -466,6 +483,31 @@ class BigNum : System.IComparable {
 		}
 
 		return $strBuilder
+	}
+
+	static [BigNum] Parse([object] $val) {
+		return [BigNum]::new($val)
+	}
+
+	static [BigNum] Min([BigNum] $a,[BigNum] $b) {
+		if ($a -lt $b) {
+			return [BigNum]::new($a)
+		}
+		return [BigNum]::new($b)
+	}
+
+	static [BigNum] Max([BigNum] $a,[BigNum] $b) {
+		if ($a -gt $b) {
+			return [BigNum]::new($a)
+		}
+		return [BigNum]::new($b)
+	}
+
+	[bool] IsInteger() {
+		if ($this.shiftVal -eq 0) {
+			return $true
+		}
+		return $false
 	}
 
 	[BigNum] Round([System.Numerics.BigInteger]$decimals){
@@ -693,6 +735,7 @@ class BigNum : System.IComparable {
 	#endregion Methods
 
 
+
 	#region Math Constants
 
 	static [BigNum] Pi() {
@@ -751,6 +794,8 @@ class BigNum : System.IComparable {
 
 	#endregion Math Constants
 
+
+
 	#region Physics Constants
 
 	static [BigNum] c() {
@@ -790,6 +835,7 @@ class BigNum : System.IComparable {
 	}
 
 	#endregion Physics Constants
+
 }
 
 #endregion Classes
