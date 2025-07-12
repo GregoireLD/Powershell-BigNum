@@ -77,7 +77,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		}
 
 		if($shift -lt 0){
-			$shiftFactor = [System.Numerics.BigInteger]::Pow(10,$shift*(-1))
+			$shiftFactor = [BigNum]::Pow(10,$shift*(-1))
 			$tmpIntegerVal *= $shiftFactor
 			$tmpShift = [System.Numerics.BigInteger]::Parse(0)
 		}
@@ -433,7 +433,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	}
 
 	static [BigNum] Log([BigNum] $value) {
-		return [BigNum]::Log($value,300)
+		return [BigNum]::Log($value,500)
 	}
 
 	static [BigNum] Log([BigNum] $value,[System.Numerics.BigInteger] $numTaylor) {
@@ -475,7 +475,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	}
 
 	static [BigNum] Exp([BigNum] $value) {
-		return [BigNum]::Exp($value,300)
+		return [BigNum]::Exp($value,500)
 	}
 
 	static [BigNum] Exp([BigNum] $exponent, [System.Numerics.BigInteger] $numTaylor) {
@@ -525,6 +525,14 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 			throw "[BigNum]::Pow is not capable of handling complex value output"
 		}
 		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Log($value)))),$value.maxDecimalResolution)
+	}
+
+	static [BigNum] Sqrt([BigNum] $value) {
+		return [BigNum]::new([BigNum]::Exp((([BigNum]"0.5")*([BigNum]::Log($value)))),$value.maxDecimalResolution)
+	}
+
+	static [BigNum] Cbrt([BigNum] $value) {
+		return [BigNum]::new([BigNum]::Exp((([BigNum]"1"/[BigNum]"3")*([BigNum]::Log($value)))),$value.maxDecimalResolution)
 	}
 
 	# static [BigNum] ModPow([BigNum] $value, [int] $exponent, [System.Numerics.BigInteger] $modulus) {
