@@ -284,7 +284,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
     }
 
 	[int] GetHashCode() {
-		return $this.ToString().GetHashCode()
+		return ("" + $this.ToString() + "/" + $this.maxDecimalResolution).GetHashCode()
     }
 
 	#endregion IComparable Implementation
