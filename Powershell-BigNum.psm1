@@ -433,6 +433,28 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [System.Numerics.BigInteger]::Parse($strTmp.Substring(0,$lastPos))
 	}
 
+	[BigNum] Abs() {
+		return [BigNum]::new($this.integerVal,$this.shiftVal,$false,$this.maxDecimalResolution)
+	}
+
+	hidden static [System.Numerics.BigInteger] EstimateTaylorTerms([BigNum] $x, [System.Numerics.BigInteger] $decimalLenght) {
+		[System.Numerics.BigInteger] $n = 1
+		[System.Numerics.BigInteger] $targetDecimalLenght = $decimalLenght+($x.ToString().Length)+10
+		[BigNum] $term = $x.Abs().ChangeResolution($targetDecimalLenght*2)
+		[BigNum] $factorial = 1
+		[BigNum] $targetEpsilon = [BigNum]::new("1",$targetDecimalLenght,$false,$targetDecimalLenght)
+		[int] $hardLimit = 10000
+
+		while ((($term / $factorial) -gt $targetEpsilon) -and ($hardLimit -gt 1)) {
+			$n += 1
+			$term *= $x
+			$factorial *= [BigNum]::new($n)
+			$hardLimit -= 1
+		}
+
+		return $n
+	}
+
 	static [BigNum] Log([BigNum] $value) {
 		return [BigNum]::Log($value,500)
 	}
@@ -476,14 +498,14 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	}
 
 	static [BigNum] Exp([BigNum] $value) {
-		return [BigNum]::Exp($value,500)
+		return [BigNum]::Exp($value,[BigNum]::EstimateTaylorTerms($value,$value.maxDecimalResolution))
 	}
 
 	static [BigNum] Exp([BigNum] $exponent, [System.Numerics.BigInteger] $numTaylor) {
 		# Initialize terms
-		[BigNum] $result = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution)  # Sum accumulator
-		[BigNum] $term = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution)    # Current term (starts at 1)
-		[BigNum] $factorial = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution) # Current factorial value
+		[BigNum] $result = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution+10)  # Sum accumulator
+		[BigNum] $term = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution+10)    # Current term (starts at 1)
+		[BigNum] $factorial = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution+10) # Current factorial value
 
 		for ([System.Numerics.BigInteger] $n = 1; $n -le $numTaylor; $n += 1) {
 			$term *= $exponent
@@ -491,7 +513,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 			$result += $term / $factorial
 		}
 
-		return $result
+		return $result.Crop($exponent.maxDecimalResolution)
 	}
 
 	static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
