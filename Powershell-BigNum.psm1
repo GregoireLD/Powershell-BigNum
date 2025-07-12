@@ -432,33 +432,6 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [System.Numerics.BigInteger]::Parse($strTmp.Substring(0,$lastPos))
 	}
 
-	static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
-		if($exponent.IsInteger()) {
-			return [BigNum]::IntPow($value, $exponent.Int())
-		}
-		return [BigNum]::FloatPow($value, $exponent)
-	}
-
-	hidden static [BigNum] IntPow([BigNum] $value, [System.Numerics.BigInteger] $exponent) {
-		[System.Numerics.BigInteger] $residualExp = [System.Numerics.BigInteger]::Parse($exponent);
-		[System.Numerics.BigInteger] $intValue = [System.Numerics.BigInteger]::Parse($value.integerVal)
-		if ($value.IsNegative()) { $intValue *= -1 }
-		[System.Numerics.BigInteger] $shiftValue = [System.Numerics.BigInteger]::Parse($value.shiftVal)
-		[System.Numerics.BigInteger] $total = 1
-		[System.Numerics.BigInteger] $maxPow = 0
-
-     	while ($residualExp -gt [int16]::MaxValue) {
-			if ($maxPow -eq 0) {
-				$maxPow = [System.Numerics.BigInteger]::Pow($intValue, [int16]::MaxValue);
-			}
-        	$residualExp -= [int16]::MaxValue
-        	$total *= $maxPow
-     	}
-
-     	$total *= [System.Numerics.BigInteger]::Pow($intValue, [int16]$residualExp);
-		return [BigNum]::new($total,$shiftValue*$exponent,$false,$value.maxDecimalResolution)
-	}
-
 	static [BigNum] Log([BigNum] $value) {
 		return [BigNum]::Log($value,300)
 	}
@@ -501,10 +474,58 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [BigNum]::new($tmpT+$powerAdjust,$value.maxDecimalResolution)
 	}
 
-	# hidden static [BigNum] FloatPow([BigNum] $value, [BigNum] $exponent) {
+	static [BigNum] Exp([BigNum] $value) {
+		return [BigNum]::Exp($value,300)
+	}
 
-	# 	return [BigNum]::new($null,$null,$null,[BigNum]::Max($value,$exponent))
-	# }
+	static [BigNum] Exp([BigNum] $exponent, [System.Numerics.BigInteger] $numTaylor) {
+		# Initialize terms
+		[BigNum] $result = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution)  # Sum accumulator
+		[BigNum] $term = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution)    # Current term (starts at 1)
+		[BigNum] $factorial = [BigNum]::new(1).ChangeResolution($exponent.maxDecimalResolution) # Current factorial value
+
+		for ([System.Numerics.BigInteger] $n = 1; $n -le $numTaylor; $n += 1) {
+			$term *= $exponent
+			$factorial *= [BigNum]::new($n)
+			$result += $term / $factorial
+		}
+
+		return $result
+	}
+
+	static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
+		if($exponent.IsInteger()) {
+			return [BigNum]::IntPow($value, $exponent.Int())
+		}
+		return [BigNum]::FloatPow($value, $exponent)
+	}
+
+	hidden static [BigNum] IntPow([BigNum] $value, [System.Numerics.BigInteger] $exponent) {
+		[System.Numerics.BigInteger] $residualExp = [System.Numerics.BigInteger]::Parse($exponent);
+		[System.Numerics.BigInteger] $intValue = [System.Numerics.BigInteger]::Parse($value.integerVal)
+		if ($value.IsNegative()) { $intValue *= -1 }
+		[System.Numerics.BigInteger] $shiftValue = [System.Numerics.BigInteger]::Parse($value.shiftVal)
+		[System.Numerics.BigInteger] $total = 1
+		[System.Numerics.BigInteger] $maxPow = 0
+
+     	while ($residualExp -gt [int16]::MaxValue) {
+			if ($maxPow -eq 0) {
+				$maxPow = [System.Numerics.BigInteger]::Pow($intValue, [int16]::MaxValue);
+			}
+        	$residualExp -= [int16]::MaxValue
+        	$total *= $maxPow
+     	}
+
+     	$total *= [System.Numerics.BigInteger]::Pow($intValue, [int16]$residualExp);
+		return [BigNum]::new($total,$shiftValue*$exponent,$false,$value.maxDecimalResolution)
+	}
+
+	hidden static [BigNum] FloatPow([BigNum] $value, [BigNum] $exponent) {
+		if ($value.negativeFlag) {
+			throw "[BigNum]::Pow is not capable of handling complex value output"
+		}
+		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Log($value)))),$value.maxDecimalResolution)
+	}
 
 	# static [BigNum] ModPow([BigNum] $value, [int] $exponent, [System.Numerics.BigInteger] $modulus) {
 	# 	return [BigNum]::new([System.Numerics.BigInteger]::ModPow($this.integerVal,$exponent.val,$modulus.val))
