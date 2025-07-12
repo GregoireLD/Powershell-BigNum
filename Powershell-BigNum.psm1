@@ -169,7 +169,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		$tmpIntegerVal = [System.Numerics.BigInteger]::Parse($strNewVal[0])
 
 		if ($tmpShiftVal -gt 0){
-			$tmpIntegerVal *= [System.Numerics.BigInteger]::Pow(10,$tmpShiftVal)
+			$tmpIntegerVal *= [BigNum]::PowTen($tmpShiftVal)
 			$tmpIntegerVal += $strNewVal[-1]
 		}
 
@@ -194,7 +194,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		$tmpIntegerVal = [System.Numerics.BigInteger]::Parse($strNewVal[0])
 
 		if ($tmpShiftVal -gt 0){
-			$tmpIntegerVal *= [System.Numerics.BigInteger]::Pow(10,$tmpShiftVal)
+			$tmpIntegerVal *= [BigNum]::PowTen($tmpShiftVal)
 			$tmpIntegerVal += $strNewVal[-1]
 		}
 
@@ -258,27 +258,28 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		# Simply perform (case-insensitive) lexical comparison on the .Kind
 		# property values.
 		if ($null -eq $other) {return 1}
+		[BigNum] $tmpOther = $other
 
-		if (($this.integerVal -eq $other.integerVal) -and ($this.shiftVal -eq $other.shiftVal) -and ($this.negativeFlag -eq $other.negativeFlag)) { return 0 }
+		if (($this.integerVal -eq $tmpOther.integerVal) -and ($this.shiftVal -eq $tmpOther.shiftVal) -and ($this.negativeFlag -eq $tmpOther.negativeFlag)) { return 0 }
 
 		[System.Numerics.BigInteger]$tmpThis = $this.integerVal
-		[System.Numerics.BigInteger]$tmpOther = $other.integerVal
+		[System.Numerics.BigInteger]$tmpOtherInt = $tmpOther.integerVal
 		
 		if ($this.negativeFlag) { $tmpThis *= -1 }
-		if ($other.negativeFlag) { $tmpOther *= -1 }
+		if ($tmpOther.negativeFlag) { $tmpOtherInt *= -1 }
 
-		if ($this.shiftVal -ne $other.shiftVal) {
-			if ($this.shiftVal -gt $other.shiftVal) {
-				$shiftDifference = $this.shiftVal - $other.shiftVal
-				$shiftFactor = [System.Numerics.BigInteger]::Pow(10,$shiftDifference)
-				$tmpOther *= $shiftFactor
+		if ($this.shiftVal -ne $tmpOther.shiftVal) {
+			if ($this.shiftVal -gt $tmpOther.shiftVal) {
+				$shiftDifference = $this.shiftVal - $tmpOther.shiftVal
+				$shiftFactor = [BigNum]::PowTen($shiftDifference)
+				$tmpOtherInt *= $shiftFactor
 			}else{
-				$shiftDifference = $other.shiftVal - $this.shiftVal
-				$shiftFactor = [System.Numerics.BigInteger]::Pow(10,$shiftDifference)
+				$shiftDifference = $tmpOther.shiftVal - $this.shiftVal
+				$shiftFactor = [BigNum]::PowTen($shiftDifference)
 				$tmpThis *= $shiftFactor
 			}
 		}
-		if ($tmpThis -lt $tmpOther) {return -1 }
+		if ($tmpThis -lt $tmpOtherInt) {return -1 }
 
 		return 1 # -gt
     }
@@ -324,11 +325,11 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		if ($a.shiftVal -ne $b.shiftVal) {
 			if ($a.shiftVal -gt $b.shiftVal) {
 				$shiftDifference = $a.shiftVal - $b.shiftVal
-				$shiftFactor = [System.Numerics.BigInteger]::Pow(10,$shiftDifference)
+				$shiftFactor = [BigNum]::PowTen($shiftDifference)
 				$tmpB *= $shiftFactor
 			}else{
 				$shiftDifference = $b.shiftVal - $a.shiftVal
-				$shiftFactor = [System.Numerics.BigInteger]::Pow(10,$shiftDifference)
+				$shiftFactor = [BigNum]::PowTen($shiftDifference)
 				$tmpA *= $shiftFactor
 			}
 		}
@@ -347,11 +348,11 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		if ($a.shiftVal -ne $b.shiftVal) {
 			if ($a.shiftVal -gt $b.shiftVal) {
 				$shiftDifference = $a.shiftVal - $b.shiftVal
-				$shiftFactor = [System.Numerics.BigInteger]::Pow(10,$shiftDifference)
+				$shiftFactor = [BigNum]::PowTen($shiftDifference)
 				$tmpB *= $shiftFactor
 			}else{
 				$shiftDifference = $b.shiftVal - $a.shiftVal
-				$shiftFactor = [System.Numerics.BigInteger]::Pow(10,$shiftDifference)
+				$shiftFactor = [BigNum]::PowTen($shiftDifference)
 				$tmpA *= $shiftFactor
 			}
 		}
@@ -378,7 +379,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	  	if ($a.negativeFlag) { $tmpA *= -1 }
 	  	if ($b.negativeFlag) { $tmpB *= -1 }
 
-		$tmpA *= [System.Numerics.BigInteger]::Pow(10,$newDecimalResolution + $b.shiftVal)
+		$tmpA *= [BigNum]::PowTen($newDecimalResolution + $b.shiftVal)
 
 		return [BigNum]::new($tmpA / $tmpB,$newDecimalResolution + $a.shiftVal,$newDecimalResolution)
 	}
@@ -398,7 +399,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		[System.Numerics.BigInteger]$newShiftVal = $a.shiftVal - $b
 
 		if ($newShiftVal -lt 0) {
-			$tmpA *= [System.Numerics.BigInteger]::Pow(10,-$newShiftVal)
+			$tmpA *= [BigNum]::PowTen(-$newShiftVal)
 			$newShiftVal=0
 		}
 
@@ -527,6 +528,30 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Log($value)))),$value.maxDecimalResolution)
 	}
 
+	hidden static [System.Numerics.BigInteger] PowTen([BigNum] $exponent) {
+		if ($exponent.negativeFlag) {
+			throw "[BigNum]::PowTen is only to be used with positive exponents. For negative exponents, use [BigNum]::Pow instead."
+		}
+		if (-not $exponent.IsInteger()) {
+			throw "[BigNum]::PowTen is only to be used with integer exponents. For non-integer exponents, use [BigNum]::Pow instead."
+		}
+
+		[System.Numerics.BigInteger] $residualExp = $exponent.Int();
+		[System.Numerics.BigInteger] $total = 1
+		[System.Numerics.BigInteger] $maxPow = 0
+
+     	while ($residualExp -gt [int16]::MaxValue) {
+			if ($maxPow -eq 0) {
+				$maxPow = [System.Numerics.BigInteger]::Pow(10, [int16]::MaxValue);
+			}
+        	$residualExp -= [int16]::MaxValue
+        	$total *= $maxPow
+     	}
+
+     	$total *= [System.Numerics.BigInteger]::Pow(10, [int16]$residualExp);
+		return [System.Numerics.BigInteger]::Parse($total)
+	}
+
 	static [BigNum] Sqrt([BigNum] $value) {
 		return [BigNum]::new([BigNum]::Exp((([BigNum]"0.5")*([BigNum]::Log($value)))),$value.maxDecimalResolution)
 	}
@@ -644,7 +669,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 			if ($toRound -gt ($newValStr.Length - 1)) {
 				$newVal = "0"
 				if (($this.integerVal -ne 0) -and (-not $this.negativeFlag)) {
-					$newVal = [System.Numerics.BigInteger]::Pow(10,$toRound - $this.shiftVal)
+					$newVal = [BigNum]::PowTen($toRound - $this.shiftVal)
 				}
 				$newSign = $false
 				$newShift = "0"
@@ -688,7 +713,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 				$newVal = "0"
 				$newSign = $false
 				if (($this.integerVal -ne 0) -and ($this.negativeFlag)) {
-					$newVal = [System.Numerics.BigInteger]::Pow(10,$toRound - $this.shiftVal)
+					$newVal = [BigNum]::PowTen($toRound - $this.shiftVal)
 					$newSign = $true
 				}
 				$newShift = "0"
@@ -763,7 +788,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 			if ($toRound -gt ($newValStr.Length - 1)) {
 				$newVal = "0"
 				if (($this.integerVal -ne 0)) {
-					$newVal = [System.Numerics.BigInteger]::Pow(10,$toRound - $this.shiftVal)
+					$newVal = [BigNum]::PowTen($toRound - $this.shiftVal)
 				}
 				$newShift = "0"
 			}else{
@@ -806,7 +831,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 					$tmpShift = [System.Numerics.BigInteger]::Parse($decimals)
 				}else{
 					$tmpShift = [System.Numerics.BigInteger]::Parse(0)
-					$tmpVal *= [System.Numerics.BigInteger]::Pow(10,-$decimals)
+					$tmpVal *= [BigNum]::PowTen(-$decimals)
 				}
 			}else{
 				$tmpShift = [System.Numerics.BigInteger]::Parse(0)
