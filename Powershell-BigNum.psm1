@@ -615,7 +615,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [System.Numerics.BigInteger]::Parse($total)
 	}
 
-	static [BigNum] PowTen([System.Numerics.BigInteger] $exponent) {
+	hidden static [BigNum] PowTen([System.Numerics.BigInteger] $exponent) {
 		if ($exponent -ge 0) { return [BigNum]::Parse([BigNum]::PowTenPositive($exponent)) }
 		$tmpExp = -$exponent
 		return [BigNum]::new(1,$tmpExp,$false,$tmpExp)
@@ -627,7 +627,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		}
 
 		$tmpResolution = $value.maxDecimalResolution + 10
-		$tmpValue = $value.Clone().ChangeResolution($tmpResolution)
+		$tmpValue = $value.CloneWithNewRes($tmpResolution)
 		$constOne = [BigNum]::new(1).ChangeResolution($tmpResolution)
 
 		# Initial guess: S / 2 or 1 if S < 1
@@ -651,7 +651,93 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	}
 
 	static [BigNum] Cbrt([BigNum] $value) {
-		return [BigNum]::new([BigNum]::Exp(((([BigNum]"1").ChangeResolution($value.maxDecimalResolution*2)/([BigNum]"3").ChangeResolution($value.maxDecimalResolution*2))*([BigNum]::Log($value.ChangeResolution($value.maxDecimalResolution+10))))),$value.maxDecimalResolution)
+		return [BigNum]::NthRootInt($value,3)
+	}
+
+	hidden static [BigNum] NthRootInt([BigNum] $value, [System.Numerics.BigInteger] $n) {
+		if ($n -eq 0) {
+			throw "[BigNum]::NthRootInt() - exponent 'n' cannot be zero"
+		}
+
+		if ($value -lt 0 -and (($n % 2) -eq 0)) {
+			throw "[BigNum]::NthRootInt() cannot compute even roots of negative numbers"
+		}
+
+		# Setup high resolution for internal calculations
+		$tmpResolution = $value.maxDecimalResolution + 10
+		$tmpValue = $value.CloneWithNewRes($tmpResolution)
+		$x = [BigNum]::PowTen(0)
+
+		# Initial guess: 10 ^ floor(numDigits / n)
+		if(($tmpValue -lt 1) -and ($tmpValue -gt -1)){
+			$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).ChangeResolution($tmpResolution)
+		} else {
+			$numDigits = $tmpValue.integerVal.ToString().Length
+			$approxExp = $numDigits / $n
+			$x = [BigNum]::PowTen($approxExp).ChangeResolution($tmpResolution)
+		}
+
+		# Precompute constants
+		$nBig = [BigNum]::new($n).ChangeResolution($tmpResolution)
+		$nMinusOne = $nBig - 1
+		$epsilon = [BigNum]::PowTen(5-$tmpResolution).ChangeResolution($tmpResolution)
+
+		# Newton-Raphson iterations
+		$diff = $x
+		do {
+			$xPrev = $x
+			$xPower = [BigNum]::Pow($x, $nMinusOne)
+			$x = (($nMinusOne * $x) + ($tmpValue / $xPower)) / $nBig
+			$diff = ($x - $xPrev).Abs()
+		} while ($diff -gt $epsilon)
+
+		# Return cropped to requested resolution
+		return $x.Crop($value.maxDecimalResolution).ChangeResolution($value.maxDecimalResolution)
+	}
+
+	static [BigNum] NthRoot([BigNum] $value, [BigNum] $n) {
+		if ($n -eq 0) {
+			throw "[BigNum]::NthRoot() - exponent 'n' cannot be zero"
+		}
+
+		if($n.IsInteger()) {
+			return [BigNum]::NthRootInt($value,$n.integerVal*(($n -lt 0)?-1:1))
+		}
+
+		$constTwo = [BigNum]::new(2)
+
+		if (($value -lt 0) -and ((-not $n.IsInteger()) -or (($n % $constTwo) -eq 0))) {
+			throw "[BigNum]::NthRoot() - negative base with non-odd integer root leads to complex result"
+		}
+
+		$tmpResolution = $value.maxDecimalResolution + 10
+		$tmpValue = $value.CloneWithNewRes($tmpResolution)
+		$x = [BigNum]::PowTen(0)
+
+		# Initial guess: 10 ^ (numDigits / n)
+		if(($tmpValue -lt 1) -and ($tmpValue -gt -1)){
+			$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).ChangeResolution($tmpResolution)
+		} else {
+			$numDigits = [BigNum]::Parse($tmpValue.integerVal.ToString().Length)
+			$approxExp = $numDigits / $n
+			$x = [BigNum]::PowTen($approxExp.Round(0).Int()).ChangeResolution($tmpResolution)
+		}
+
+		# Precompute constants
+		$constOne = [BigNum]::new(1).ChangeResolution($tmpResolution)
+		# $constTwo = [BigNum]::new(2).ChangeResolution($tmpResolution)
+		$epsilon = [BigNum]::PowTen(5-$tmpResolution).ChangeResolution($tmpResolution)
+
+		$diff = $x
+		do {
+			$xPrev = $x
+			$xPowerN = [BigNum]::Pow($x, $n)
+			$xPowerNminus1 = [BigNum]::Pow($x, $n - $constOne)
+			$x = $x - (($xPowerN - $tmpValue) / ($n * $xPowerNminus1))
+			$diff = ($x - $xPrev).Abs()
+		} while ($diff -gt $epsilon)
+
+		return $x.Crop($value.maxDecimalResolution).ChangeResolution($value.maxDecimalResolution)
 	}
 
 	# static [BigNum] ModPow([BigNum] $value, [int] $exponent, [System.Numerics.BigInteger] $modulus) {
