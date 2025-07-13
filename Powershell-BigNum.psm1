@@ -393,9 +393,9 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		[System.Numerics.BigInteger]$tmpModed = $tmpA % $b
 
 		[BigNum]$tmpResult = $a - [BigNum]$tmpA
-		[BigNum]$tmpResult += [BigNum]::new($tmpModed)
+		[BigNum]$tmpResult += $tmpModed
 
-		return [BigNum]::new($tmpResult,$a.getMaxDecimalResolution())
+		return $tmpResult.CloneWithNewRes($a.maxDecimalResolution)
 	}
 
 	static [BigNum] op_LeftShift([BigNum] $a, [System.Numerics.BigInteger] $b) {
@@ -456,6 +456,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	}
 
 	hidden static [System.Numerics.BigInteger] EstimateTaylorTermsForExp([BigNum] $x, [System.Numerics.BigInteger] $decimalLength) {
+		#This function requires a scaled $x value
 		[System.Numerics.BigInteger] $n = 1
 		[System.Numerics.BigInteger] $targetDecimalLenght = [System.Numerics.BigInteger]::Max($decimalLength,$x.maxDecimalResolution)+10
 		[BigNum] $absX = $x.Abs().ChangeResolution($targetDecimalLenght)
@@ -485,7 +486,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 
 		$tmpResolution = $value.maxDecimalResolution + 100
 		
-		[BigNum] $tmpVal = [BigNum]::new($value).ChangeResolution($tmpResolution)
+		[BigNum] $tmpVal = $value.CloneWithNewRes($tmpResolution)
 		[BigNum] $tmpOne = [BigNum]::new("1.0").ChangeResolution($tmpResolution)
 		[BigNum] $tmpQuarter = [BigNum]::new("0.25").ChangeResolution($tmpResolution)
 		[System.Numerics.BigInteger] $powerAdjust = [System.Numerics.BigInteger]::Parse(0);
@@ -505,7 +506,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		[System.Numerics.BigInteger] $TAYLOR_ITERATIONS = [BigNum]::EstimateTaylorTermsForLog($tmpVal,$tmpResolution)
 		[BigNum] $tmpT = [BigNum]::new(0).ChangeResolution($tmpResolution)
 		[BigNum] $tmpS = [BigNum]::new(1).ChangeResolution($tmpResolution)
-		[BigNum] $tmpZ = [BigNum]::new($tmpVal).ChangeResolution($tmpResolution)
+		[BigNum] $tmpZ = $tmpVal.CloneWithNewRes($tmpResolution)
 
 		for ([BigNum]$k = 1; $k -le $TAYLOR_ITERATIONS; $k += 1) {
 			$tmpT += $tmpZ * $tmpS / $k
@@ -553,7 +554,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 			$result *= $result
 		}
 
-		return [BigNum]::new($result).Crop($exponent.maxDecimalResolution).ChangeResolution($exponent.maxDecimalResolution)
+		return $result.Clone().Crop($exponent.maxDecimalResolution).ChangeResolution($exponent.maxDecimalResolution)
 	}
 
 	static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
@@ -590,18 +591,14 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Log($value)))),$value.maxDecimalResolution)
 	}
 
-	hidden static [System.Numerics.BigInteger] PowTenPositive([BigNum] $exponent) {
-		if (-not $exponent.IsInteger()) {
-			throw "[BigNum]::PowTenPositive is only to be used with integer exponents. For non-integer exponents, use [BigNum]::Pow instead."
-		}
-
+	hidden static [System.Numerics.BigInteger] PowTenPositive([System.Numerics.BigInteger] $exponent) {
 		if ($exponent -lt 0) {
 			throw "[BigNum]::PowTenPositive is only to be used with positive or null exponents. For negative exponents, use [BigNum]::Pow instead."
 		}
 
 		if($exponent -eq 0) {return [System.Numerics.BigInteger]::Parse(1)}
 
-		[System.Numerics.BigInteger] $residualExp = $exponent.Int();
+		[System.Numerics.BigInteger] $residualExp = [System.Numerics.BigInteger]::Parse($exponent);
 		[System.Numerics.BigInteger] $total = 1
 		[System.Numerics.BigInteger] $maxPow = 0
 
@@ -618,22 +615,39 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [System.Numerics.BigInteger]::Parse($total)
 	}
 
-	hidden static [BigNum] PowTen([BigNum] $exponent) {
-		if (-not $exponent.IsInteger()) {
-			throw "[BigNum]::PowTen is only to be used with integer exponents. For non-integer exponents, use [BigNum]::Pow instead."
-		}
-
-		if ($exponent -ge 0) { return [BigNum]::PowTenPositive($exponent.Int()) }
-
-     	$baseStr = [BigNum]::PowTenPositive($exponent.Int()).ToString()
-
-		$baseStr = $baseStr.Replace("10","0,") + "1"
-
-		return [BigNum]::Parse($baseStr)
+	static [BigNum] PowTen([System.Numerics.BigInteger] $exponent) {
+		if ($exponent -ge 0) { return [BigNum]::Parse([BigNum]::PowTenPositive($exponent)) }
+		$tmpExp = -$exponent
+		return [BigNum]::new(1,$tmpExp,$false,$tmpExp)
 	}
 
 	static [BigNum] Sqrt([BigNum] $value) {
-		return [BigNum]::new([BigNum]::Exp((([BigNum]"0.5").ChangeResolution($value.maxDecimalResolution*2)*([BigNum]::Log($value.ChangeResolution($value.maxDecimalResolution+10))))),$value.maxDecimalResolution)
+		if ($value.IsNegative()) {
+        	throw "[BigNum]::Sqrt() is not defined for negative numbers"
+		}
+
+		$tmpResolution = $value.maxDecimalResolution + 10
+		$tmpValue = $value.Clone().ChangeResolution($tmpResolution)
+		$constOne = [BigNum]::new(1).ChangeResolution($tmpResolution)
+
+		# Initial guess: S / 2 or 1 if S < 1
+    	# [BigNum] $x = ($tmpValue -lt $constOne) ? $constOne.clone() : ($tmpValue / $constTwo)
+		[BigNum] $x = ($tmpValue -lt $constOne) ? ([BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length))) : (($tmpValue.integerVal.ToString().Length%2)?([BigNum]::PowTen(($tmpValue.integerVal.ToString().Length - 1)/2)):([BigNum]::PowTen($tmpValue.integerVal.ToString().Length/2)))
+		# Convergence threshold
+    	[BigNum] $epsilon = [BigNum]::PowTen(-$tmpResolution).ChangeResolution($tmpResolution)
+
+
+		[BigNum] $half = [BigNum]::new(0.5).ChangeResolution($tmpResolution)
+    	[BigNum] $diff = $constOne.clone()
+
+		do {
+			$prev_x = $x
+			$x = $half * ($x + ($tmpValue / $x))
+			$diff = ($x - $prev_x).Abs()
+		} while ($diff -gt $epsilon)
+
+		# Return cropped to user-specified resolution
+		return $x.Clone().Crop($value.maxDecimalResolution).ChangeResolution($value.maxDecimalResolution)
 	}
 
 	static [BigNum] Cbrt([BigNum] $value) {
@@ -923,6 +937,14 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [BigNum]::new($tmpVal,$tmpShift,$tmpSign,$tmpResolution)
 	}
 
+	[BigNum] Clone() {
+		return [BigNum]::new($this.integerVal,$this.shiftVal,$this.negativeFlag,$this.maxDecimalResolution)
+	}
+
+	[BigNum] CloneWithNewRes([System.Numerics.BigInteger] $newResolution) {
+		return [BigNum]::new($this.integerVal,$this.shiftVal,$this.negativeFlag,$newResolution)
+	}
+
 	#endregion Methods
 
 
@@ -988,7 +1010,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		[BigNum]::cachedPi = [BigNum]::new([BigNum]$tmpPi).Crop($resolution).ChangeResolution($resolution)
 		[BigNum]::cachedTau = ([BigNum]::cachedPi * 2).Crop($resolution).ChangeResolution($resolution)
 
-		return [BigNum]::new([BigNum]::cachedPi)
+		return [BigNum]::cachedPi.Clone()
 	}
 
 	static [void] ClearCachedPi() {
@@ -1018,7 +1040,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 
 		[BigNum]::Pi($resolution)
 
-		return [BigNum]::new([BigNum]::cachedTau)
+		return [BigNum]::cachedTau.Clone()
 	}
 
 	static [void] ClearCachedTau() {
@@ -1058,7 +1080,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 
 		[BigNum]::cachedE = [BigNum]::new($result).Crop($resolution).ChangeResolution($resolution)
 
-		return [BigNum]::new([BigNum]::cachedE)
+		return [BigNum]::cachedE.Clone()
 	}
 
 	static [void] ClearCachedE() {
