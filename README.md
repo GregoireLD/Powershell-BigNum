@@ -1,13 +1,29 @@
-# Powershell-BigNum
-Powershell / DotNet [BigNum] arbitrary-precision decimal Class, based on the BigInt class.
-Allow signed decimal storage and calculation of arbitrary lenght and precision.
-Most usual operators are implemented : addition, substraction, multiplication, division, modulo, base-10 left shift, base-10 right shift.
-This class implements "IComparable", and as such, implements -eq, -lt, -le, -gt, and -ge.
-[BigNum] can be rounded with 5 functions : Round (nearest half), RoundUp (always bigger), RoundUp (always smaller), RoundTowardZero (always closer to zero), RoundAwayFromZero (always away from zero).
+# BigNum PowerShell Class
 
-## Samples :
+⚡ **High-Precision Big Number Arithmetic in PowerShell** ⚡
 
-### Auto-Loading :
+This project provides a **`BigNum` PowerShell class** designed for advanced mathematical operations with arbitrary-precision decimal numbers.
+It includes a wide set of features: from basic arithmetic to transcendental functions, roots, and famous mathematical and physical constants.
+
+> **Why?**
+> PowerShell has no built-in arbitrary-precision decimal type — but sometimes you need more than `double` or `decimal` for scientific calculations, cryptography, or precise numerical methods.
+
+---
+
+## ✨ Features
+
+✅ Arbitrary-precision arithmetic (`+`, `-`, `*`, `/`, `%`)
+✅ Power functions (`Pow`, handles integer & non-integer exponents)
+✅ Roots: square root, cube root, **nth root (integer and non-integer)**
+✅ Exponential and logarithm (`Exp`, `Log`)
+✅ Famous mathematical constants (`Pi`, `e`, `Tau`, `phi`, etc.)
+✅ Physical constants (speed of light, Planck constant, Avogadro, etc.)
+✅ Flexible decimal resolution control
+✅ Extensive rounding and cropping methods
+
+---
+
+## 🔧 Installation
 
 To use this module, the "Powershell-BigNum" folder, contaning both the psm1
 and the psd1 files, must be in one of your default Powershell Modules folder.
@@ -17,57 +33,130 @@ You can check what they are using :
 Write-Output $env:PSModulePath
 ```
 
-### Manual Loading :
-
-You can also manually enable it using the folowing command :
+alternatively, you can also manually enable it using the folowing command :
 
 ```powershell
 Import-Module <Path_to_the_Powershell-BigNum.psm1_file>
 ```
 
-### Various Samples :
+---
 
-#### Instantiate and store a new [BigNum] object using an explicit cast. <123> can be of type : Integer, Decimal, Float, Double, BigInteger, String
+## 🛠 Usage Examples
+
+### Basic Operations
+
 ```powershell
-$val = [BigNum] <123>
+# PowerShell-style Syntax
+$a = New-BigNum 12345
+
+# DotNet-style Syntax
+$b = [BigNum]6789
+
+$sum = $a + $b
+$diff = $a - $b
+$product = $a * $b
+$quotient = $a / $b
 ```
 
-#### Alternate way using a Cmdlet
+### Advanced Functions
+
 ```powershell
-$val = New-BigNum <123>
+$val = New-BigNum "2.5"
+
+$pow = [BigNum]::Pow($val, 3)
+$sqrt = [BigNum]::Sqrt($val)
+$cbrt = [BigNum]::Cbrt($val)
+nroot = [BigNum]::NthRoot($val, New-BigNum 5)
+$exp = [BigNum]::Exp($val)
+$log = [BigNum]::Log($val)
 ```
 
-#### Get the integer part of the number
+### Constants
+
 ```powershell
-$val.Int()
+$pi = [BigNum]::Pi(100)  # Pi at 100 decimal precision
+$e = [BigNum]::e(100)    # Euler's number at 100 decimals
+$tau = [BigNum]::Tau(100)
+$c = [BigNum]::c()        # Speed of light (exact)
 ```
 
-#### Dividing a BigNum by an implicitly casted integer (by default, trims at 100 decimal digits)
+---
+
+## ⚙️ Resolution Control
+
+Each `BigNum` instance has a **maximum decimal resolution**.
+
+* `.ChangeResolution()` → adjust working precision
+* `.Crop()` → reduce decimals to desired resolution
+* Rounding methods: `.Round()`, `.RoundUp()`, `.RoundDown()`, `.RoundTowardZero()`, `.RoundAwayFromZero()`
+
+Example:
+
 ```powershell
-$val = [BigNum]10 / 3
+$highRes = $val.ChangeResolution(200)
+$cropped = $highRes.Crop(50)
+$rounded = $cropped.Round(20)
 ```
 
-#### Instantiating a BigNum with a different decimal resolution. BigNum are immutable so changing the resolution clones the BigNum to a new object.
+---
+
+## 🚀 Advanced Features
+
+### Integer & Non-Integer Nth Roots
+
+Handles both efficiently:
+
 ```powershell
-$val = ([BigNum]10).ChangeResolution(1000) / 3
+# Integer root (fast path)
+$result = [BigNum]::NthRootInt($val, 7)
+
+# General root (including non-integer)
+$result = [BigNum]::NthRoot($val, New-BigNum "2.5")
 ```
 
-#### Rounding example
+### Cached Constants
+
+For performance, Pi, Tau, and e are cached internally.
+To clear them:
+
 ```powershell
-$val = [BigNum]10
-$val = $val.ChangeResolution(1000)
-$val = $val / 3
-$val = $val.Round(999)
-$val
+[BigNum]::ClearCachedPi()
+[BigNum]::ClearCachedTau()
+[BigNum]::ClearCachedE()
 ```
 
-#### Pi example calculation example
-```powershell
-$BigPi = [BigNum]4
-For($i=0 ; $i -lt 100000 ; $i++) {
-    $BigPi -= [BigNum]4/([BigNum]3+($i*4))
-    $BigPi += [BigNum]4/([BigNum]5+($i*4))
-}
-$BigPi = $BigPi.RoundDown(5)
-$BigPi
-```
+---
+
+## 💡 Notes
+
+* Negative numbers:
+
+  * `Sqrt()` and even `NthRootInt()` reject negative input.
+  * `Pow()` does not support complex results (negative base with non-integer exponent).
+
+* Internal computations use temporarily higher precision for stability and crop the result.
+
+* Integer exponents are optimized internally for performance; non-integer exponents use general methods like `Exp(Log(x) * n)`.
+
+---
+
+## 🧪 Planned Improvements
+
+* Modular exponentiation
+* Complex number support
+* Trigonometric functions
+* Performance optimizations (possible C# or parallelization)
+
+---
+
+## 🤝 Contributing
+
+This is an experimental PowerShell class.
+Feel free to open issues or pull requests if you want to contribute!
+
+---
+
+## 📜 License
+
+MIT License — free to use, modify, and distribute.
+
