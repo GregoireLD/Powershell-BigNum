@@ -13,12 +13,21 @@ It includes a wide set of features: from basic arithmetic to transcendental func
 ## ✨ Features
 
 ✅ Arbitrary-precision arithmetic (`+`, `-`, `*`, `/`, `%`)
+
 ✅ Power functions (`Pow`, handles integer & non-integer exponents)
+
 ✅ Roots: square root, cube root, **nth root (integer and non-integer)**
-✅ Exponential and logarithm (`Exp`, `Log`)
-✅ Famous mathematical constants (`Pi`, `e`, `Tau`, `phi`, etc.)
+
+✅ Exponential and logarithm (`Exp`, `Ln`, `Log`)
+
+✅ Famous mathematical constants with arbitrary precision (`Pi`, `e`, `Tau`, `phi`)
+
+✅ more mathematical constants with 1000 Digits (`EulerMascheroniGamma`, `AperyZeta3`, `CatalanG`, `FeigenbaumA`, `FeigenbaumDelta`)
+
 ✅ Physical constants (speed of light, Planck constant, Avogadro, etc.)
+
 ✅ Flexible decimal resolution control
+
 ✅ Extensive rounding and cropping methods
 
 ---
@@ -66,17 +75,18 @@ $val = New-BigNum "2.5"
 $pow = [BigNum]::Pow($val, 3)
 $sqrt = [BigNum]::Sqrt($val)
 $cbrt = [BigNum]::Cbrt($val)
-nroot = [BigNum]::NthRoot($val, New-BigNum 5)
+$nroot = [BigNum]::NthRoot($val, [BigNum]5)
 $exp = [BigNum]::Exp($val)
-$log = [BigNum]::Log($val)
+$log = [BigNum]::Ln($val)
+$log = [BigNum]::Log($val,3)
 ```
 
 ### Constants
 
 ```powershell
-$pi = [BigNum]::Pi(100)  # Pi at 100 decimal precision
-$e = [BigNum]::e(100)    # Euler's number at 100 decimals
-$tau = [BigNum]::Tau(100)
+$pi = [BigNum]::Pi(100)   # Pi at 100 decimal precision
+$e = [BigNum]::e(100)     # Euler's number at 100 decimals
+$tau = [BigNum]::Tau(100) # Tau at 100 decimal precision
 $c = [BigNum]::c()        # Speed of light (exact)
 ```
 
@@ -86,8 +96,8 @@ $c = [BigNum]::c()        # Speed of light (exact)
 
 Each `BigNum` instance has a **maximum decimal resolution**.
 
-* `.ChangeResolution()` → adjust working precision
-* `.Crop()` → reduce decimals to desired resolution
+* `.ChangeResolution()` → create a new instance with adjusted working precision
+* `.Crop()` → create a new instance croped to the desired length without rounding nor changing the resolution
 * Rounding methods: `.Round()`, `.RoundUp()`, `.RoundDown()`, `.RoundTowardZero()`, `.RoundAwayFromZero()`
 
 Example:
@@ -111,7 +121,7 @@ Handles both efficiently:
 $result = [BigNum]::NthRootInt($val, 7)
 
 # General root (including non-integer)
-$result = [BigNum]::NthRoot($val, New-BigNum "2.5")
+$result = [BigNum]::NthRoot($val, [BigNum]"2.5")
 ```
 
 ### Cached Constants
