@@ -11,6 +11,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	hidden static [BigNum] $cachedE
 	hidden static [BigNum] $cachedPi
 	hidden static [BigNum] $cachedTau
+	hidden static [BigNum] $cachedPhi
 	
 
 
@@ -441,7 +442,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$false,$this.maxDecimalResolution)
 	}
 
-	hidden static [System.Numerics.BigInteger] EstimateTaylorTermsForLog([BigNum] $x, [System.Numerics.BigInteger] $decimalLenght) {
+	hidden static [System.Numerics.BigInteger] EstimateTaylorTermsForLn([BigNum] $x, [System.Numerics.BigInteger] $decimalLenght) {
 		[System.Numerics.BigInteger] $n = 1
 		[System.Numerics.BigInteger] $targetDecimalLenght = [System.Numerics.BigInteger]::Max($decimalLenght,$x.maxDecimalResolution)+10
 		[BigNum] $targetEpsilon = [BigNum]::new("1",$targetDecimalLenght,$false,$targetDecimalLenght)
@@ -478,10 +479,10 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return $n
 	}
 
-	static [BigNum] Log([BigNum] $value) {
+	static [BigNum] Ln([BigNum] $value) {
 		# Trap illegal values
 		if ($value -le 0) {
-			throw "[BigNum]::Log() function is not defined for zero nor negative numbers"
+			throw "[BigNum]::Ln() function is not defined for zero nor negative numbers"
 		}
 
 		$tmpResolution = $value.maxDecimalResolution + 100
@@ -503,7 +504,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		
 		# Now use the Taylor series to calculate the logarithm
 		$tmpVal -= 1
-		[System.Numerics.BigInteger] $TAYLOR_ITERATIONS = [BigNum]::EstimateTaylorTermsForLog($tmpVal,$tmpResolution)
+		[System.Numerics.BigInteger] $TAYLOR_ITERATIONS = [BigNum]::EstimateTaylorTermsForLn($tmpVal,$tmpResolution)
 		[BigNum] $tmpT = [BigNum]::new(0).ChangeResolution($tmpResolution)
 		[BigNum] $tmpS = [BigNum]::new(1).ChangeResolution($tmpResolution)
 		[BigNum] $tmpZ = $tmpVal.CloneWithNewRes($tmpResolution)
@@ -557,6 +558,23 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		return $result.Clone().Crop($exponent.maxDecimalResolution).ChangeResolution($exponent.maxDecimalResolution)
 	}
 
+	static [BigNum] Log([BigNum] $value, [BigNum] $base) {
+		if (($base -le 0) -or ($base -eq [BigNum]::new(1))) {
+			throw "[BigNum]::Log() error: base must be positive and not equal to 1"
+		}
+		if ($value -le 0) {
+			throw "[BigNum]::Log() error: logarithm is not defined for non-positive values"
+		}
+
+		$targetResolution = ([BigNum]::Max($value.maxDecimalResolution,$base.maxDecimalResolution)).Int()
+		$tmpResolutionPlus = $targetResolution + 100
+
+		[BigNum] $lnValue = [BigNum]::Ln($value.CloneWithNewRes($tmpResolutionPlus))
+		[BigNum] $lnBase = [BigNum]::Ln($base.CloneWithNewRes($tmpResolutionPlus))
+
+		return [BigNum]::new($lnValue / $lnBase).Crop($targetResolution).ChangeResolution($targetResolution)
+	}
+
 	static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
 		if($exponent.IsInteger() -and $exponent.IsInteger() -and ($exponent -ge 0)) {
 			return [BigNum]::IntPow($value, $exponent.Int())
@@ -588,7 +606,7 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 		if ($value.negativeFlag) {
 			throw "[BigNum]::Pow is not capable of handling complex value output"
 		}
-		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Log($value)))),$value.maxDecimalResolution)
+		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($value)))),$value.maxDecimalResolution)
 	}
 
 	hidden static [System.Numerics.BigInteger] PowTenPositive([System.Numerics.BigInteger] $exponent) {
@@ -1174,7 +1192,48 @@ class BigNum : System.IComparable, System.IEquatable[Object] {
 	}
 
 	static [BigNum] phi() {
-		return [BigNum]::new("1.6180339887498948482045868343656381177203091798057628621354486227052604628189024497072072041893911374847540880753868917521266338622235369317931800607667263544333890865959395829056383226613199282902678806752087668925017116962070322210432162695486262963136144381497587012203408058879544547492461856953648644492410443207713449470495658467885098743394422125448770664780915884607499887124007652170575179788341662562494075890697040002812104276217711177780531531714101170466659914669798731761356006708748071013179523689427521948435305678300228785699782977834784587822891109762500302696156170025046433824377648610283831268330372429267526311653392473167111211588186385133162038400522216579128667529465490681131715993432359734949850904094762132229810172610705961164562990981629055520852479035240602017279974717534277759277862561943208275051312181562855122248093947123414517022373580577278616008688382952304592647878017889921990270776903895321968198615143780314997411069260886742962267575605231727775203536139362")
+		return [BigNum]::new("1.6180339887498948482045868343656381177203091798057628621354486227052604628189024497072072041893911374847540880753868917521266338622235369317931800607667263544333890865959395829056383226613199282902678806752087668925017116962070322210432162695486262963136144381497587012203408058879544547492461856953648644492410443207713449470495658467885098743394422125448770664780915884607499887124007652170575179788341662562494075890697040002812104276217711177780531531714101170466659914669798731761356006708748071013179523689427521948435305678300228785699782977834784587822891109762500302696156170025046433824377648610283831268330372429267526311653392473167111211588186385133162038400522216579128667529465490681131715993432359734949850904094762132229810172610705961164562990981629055520852479035240602017279974717534277759277862561943208275051312181562855122248093947123414517022373580577278616008688382952304592647878017889921990270776903895321968198615143780314997411069260886742962267575605231727775203536139362").ChangeResolution(1000)
+	}
+
+	static [BigNum] phi([System.Numerics.BigInteger] $resolution) {
+		if($resolution -lt 0){
+			throw "Resolution for phi must be a null or positive integer"
+		}
+
+		if (-not [BigNum]::cachedPhi) {
+        	[BigNum]::cachedPhi = [BigNum]::phi()
+    	}
+
+		if ($resolution -le 1000) {
+			return [BigNum]::phi().Crop($resolution).ChangeResolution($resolution)
+		}
+
+		if ($resolution -le [BigNum]::cachedPhi.getMaxDecimalResolution()) {
+			return [BigNum]::cachedPhi.Crop($resolution).ChangeResolution($resolution)
+		}
+
+		$tmpResolution = $resolution + 100
+
+		# First, define a few high-res constants
+		[BigNum] $constOne = [BigNum]::new(1).ChangeResolution($tmpResolution)
+		[BigNum] $constTwo = [BigNum]::new(2).ChangeResolution($tmpResolution)
+		[BigNum] $constFive = [BigNum]::new(5).ChangeResolution($tmpResolution)
+
+		# Then, get the square root of 5
+		[BigNum] $constSqrt5 = [BigNum]::Sqrt($constFive)
+		
+		# Then calculate (1 + sqrt(5)) / 2
+		[BigNum] $tmpPhi = ($constOne + $constSqrt5) / $constTwo
+		
+		# Store at the new resolution
+		[BigNum]::cachedPhi = $tmpPhi.Clone().Crop($resolution).ChangeResolution($resolution)
+
+		# Return the new value
+		return [BigNum]::cachedPhi.Clone()
+	}
+
+	static [void] ClearCachedPhi() {
+    	[BigNum]::cachedPhi = $null
 	}
 
 	static [BigNum] sqrt2() {
