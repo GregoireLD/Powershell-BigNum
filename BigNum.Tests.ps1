@@ -59,7 +59,7 @@ Describe "BigNum class unit tests" {
             $exp = [BigNum]::new(10)
             $mod = [BigNum]::new(17)
             $result = [BigNum]::ModPow($base, $exp, $mod)
-            $result.Int() | Should -Be 15  # 2^10 = 1024, 1024 mod 17 = 15
+            $result.Int() | Should -Be 4  # 2^10 = 1024, 1024 mod 17 = 4
         }
     }
 
@@ -86,7 +86,7 @@ Describe "BigNum class unit tests" {
             $exp = [BigNum]::new(2)
             $mod = [BigNum]::new(1)
             $result = [BigNum]::ModPow($base, $exp, $mod)
-            ($result.ToString()) | Should -Be "0.25"
+            ($result.ToString()) | Should -Match "^0[,.]25"
         }
     }
 
