@@ -1686,14 +1686,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			return [BigNum]::AperyZeta3().Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
+		[BigNum] $tmpAZ3 = 0
+		throw "AperyZeta3 does not support arbitrary lenght yet"
+
 		if ($resolution -le [BigNum]::cachedAperyZeta3.getMaxDecimalResolution()) {
 			return [BigNum]::cachedAperyZeta3.Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
-		$tmpResolution = $resolution + 100
+		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpAZ3 = 0
-
-		
 		
 		# Store at the new resolution
 		[BigNum]::cachedAperyZeta3 = $tmpAZ3.Clone().Truncate($resolution).CloneWithNewRes($resolution)
@@ -1726,14 +1727,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			return [BigNum]::CatalanG().Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
+		[BigNum] $tmpCatG = 0
+		throw "CatalanG does not support arbitrary lenght yet"
+
 		if ($resolution -le [BigNum]::cachedCatalanG.getMaxDecimalResolution()) {
 			return [BigNum]::cachedCatalanG.Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
-		$tmpResolution = $resolution + 100
+		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpCatG = 0
-
-		
 		
 		# Store at the new resolution
 		[BigNum]::cachedCatalanG = $tmpCatG.Clone().Truncate($resolution).CloneWithNewRes($resolution)
@@ -1766,15 +1768,16 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			return [BigNum]::FeigenbaumA().Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
+		[BigNum] $tmpFA = 0
+		throw "FeigenbaumA does not support arbitrary lenght yet"
+
 		if ($resolution -le [BigNum]::cachedFeigenbaumA.getMaxDecimalResolution()) {
 			return [BigNum]::cachedFeigenbaumA.Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
-		$tmpResolution = $resolution + 100
+		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpFA = 0
 
-		
-		
 		# Store at the new resolution
 		[BigNum]::cachedFeigenbaumA = $tmpFA.Clone().Truncate($resolution).CloneWithNewRes($resolution)
 
@@ -1806,15 +1809,16 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			return [BigNum]::FeigenbaumDelta().Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
+		[BigNum] $tmpFD = 0
+		throw "FeigenbaumDelta does not support arbitrary lenght yet"
+
 		if ($resolution -le [BigNum]::cachedFeigenbaumDelta.getMaxDecimalResolution()) {
 			return [BigNum]::cachedFeigenbaumDelta.Truncate($resolution).CloneWithNewRes($resolution)
 		}
 
-		$tmpResolution = $resolution + 100
+		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpFD = 0
 
-		
-		
 		# Store at the new resolution
 		[BigNum]::cachedFeigenbaumDelta = $tmpFD.Clone().Truncate($resolution).CloneWithNewRes($resolution)
 

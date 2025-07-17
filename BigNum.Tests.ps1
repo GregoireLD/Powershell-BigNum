@@ -70,13 +70,13 @@ Describe "BigNum class unit tests" {
             { [BigNum]::Ln("-42.42").ToString() } | Should -Throw
         }
         It "Log works with positive integers" {
-            [BigNum]::Log(42,3).ToString() | Should -Match "^3[,.]4021735027328"
+            [BigNum]::Log(3,43).ToString() | Should -Match "^3[,.]42359188449767959"
         }
         It "Log works with positive non-integer" {
-            [BigNum]::Log("0.42","75").ToString() | Should -Match "^-0[,.]2009271467325899121"
+            [BigNum]::Log("75","0.42").ToString() | Should -Match "^-0[,.]2009271467325899121"
         }
         It "Log throws with a negative base" {
-            { [BigNum]::Log("412","-42.42").ToString() } | Should -Throw
+            { [BigNum]::Log("-42.42","412").ToString() } | Should -Throw
         }
     }
 
