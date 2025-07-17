@@ -77,8 +77,8 @@ $sqrt = [BigNum]::Sqrt($val)
 $cbrt = [BigNum]::Cbrt($val)
 $nroot = [BigNum]::NthRoot($val, [BigNum]5)
 $exp = [BigNum]::Exp($val)
-$log = [BigNum]::Ln($val)
-$log = [BigNum]::Log($val,3)
+$ln = [BigNum]::Ln($val)
+$log = [BigNum]::Log(10,$val)
 ```
 
 ### Constants
@@ -146,7 +146,7 @@ To clear them:
 
 * Internal computations use temporarily higher precision for stability and crop the result.
 
-* Integer exponents are optimized internally for performance; non-integer exponents use general methods like `Exp(Log(x) * n)`.
+* Integer exponents are optimized internally for performance; non-integer exponents use general methods like `Exp(Ln(x) * n)`.
 
 ---
 

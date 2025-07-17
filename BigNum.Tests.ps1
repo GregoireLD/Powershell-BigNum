@@ -132,5 +132,11 @@ Describe "BigNum class unit tests" {
         It "Phi has correct start" {
             [BigNum]::Phi(1042).ToString() | Should -Match "^1[,.]618033"
         }
+        It "Bernoulli Number B generate correclty" {
+            ([BigNum]::BernoulliNumberB(500,10)%100000).ToString() | Should -Match "^78222[,.]861872522"
+        }
+        It "Harmonic series Hn generate correclty" {
+            [BigNum]::HarmonicSeriesHn(50,10).ToString() | Should -Match "^4[,.]4992053383"
+        }
     }
 }
