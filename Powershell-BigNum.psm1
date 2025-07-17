@@ -950,6 +950,45 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return [System.Numerics.BigInteger]::ModPow($base,$exponent,$modulus)
 	}
 
+	# Factorial : Returns $value Factorial. Internaly calls FactorialIntMulRange.
+	static [BigNum] Factorial([BigNum] $value) {
+		if ($value -lt 0) {
+			throw "[BigNum]::Factorial() error: n must be >= 0."
+		}
+		if ($value -le 1) {
+			return [BigNum]::parse("1")
+		}
+
+		if ($value.HasDecimals()) {
+			throw "[BigNum]::Factorial() error: n must be an integer for now"
+		}
+
+		# Product 2..n (1 doesn't change)
+		return ([BigNum]::new(([BigNum]::FactorialIntMulRange(2, $value.Int())),0,$false,[BigNum]::defaultMaxDecimalResolution))
+	}
+
+	# FactorialIntMulRange : INTERNAL USE. Compute the Factorial using the Split‑Recursive method.
+	hidden static [System.Numerics.BigInteger] FactorialIntMulRange( [System.Numerics.BigInteger] $lo, [System.Numerics.BigInteger] $hi){
+		[int] $cutoff = 64
+		if ($hi -lt $lo) { return [System.Numerics.BigInteger]::One }
+		if ($hi -eq $lo) { return $hi }
+
+		# Small range: loop
+		if (($hi - $lo) -lt $cutoff) {
+			[System.Numerics.BigInteger]$p = [System.Numerics.BigInteger]::One
+			for([System.Numerics.BigInteger]$k=$lo; $k -le $hi; $k += 1){
+				$p = $p * $k
+			}
+			return $p
+		}
+
+		# Recursive split
+		[System.Numerics.BigInteger]$mid = ($lo + $hi) / 2
+		[System.Numerics.BigInteger]$left  = [BigNum]::FactorialIntMulRange($lo,  $mid)
+		[System.Numerics.BigInteger]$right = [BigNum]::FactorialIntMulRange($mid+1,$hi)
+		return $left * $right
+	}
+
 	#endregion static Operators and Methods
 
 	
@@ -958,12 +997,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Int : Return a signed BigInteger contaning the original value truncated to zero decimals.
 	[System.Numerics.BigInteger] Int() {
-		$strTmp = $this.integerVal.ToString()
-		$lastPos=$strTmp.Length-$this.shiftVal
-		if ($lastPos -lt 0) {
-			return ([System.Numerics.BigInteger]0)
-		}
-		return [System.Numerics.BigInteger]::Parse(($this.IsStrictlyNegative()?"-":"") + $strTmp.Substring(0,$lastPos))
+		return [System.Numerics.BigInteger]::Parse($this.Truncate(0))
 	}
 
 	# Abs : Return a clone containing the absulute value of the original BigNum.
@@ -1075,7 +1109,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return [BigNum]::new($newVal,$newShift,$newSign,$this.maxDecimalResolution)
 	}
 
-	# Ceiling : Return a clone of the original BigNum rounded to $decimals digits, using the always down rule.
+	# Floor : Return a clone of the original BigNum rounded to $decimals digits, using the always down rule.
 	[BigNum] Floor([System.Numerics.BigInteger]$decimals){
 		$alteration = 0
 		if ($this.negativeFlag) {
@@ -1401,7 +1435,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		$A = New-Object object[] ($n+1)
 
-		for($m=0; $m -le $n; $m++){
+		for($m=0; $m -le $n; $m += 1){
 
 			# A[m] = 1 / (m+1)
 			$num = [System.Numerics.BigInteger]::One

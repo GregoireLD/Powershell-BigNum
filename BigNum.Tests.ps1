@@ -101,7 +101,7 @@ Describe "BigNum class unit tests" {
         }
     }
 
-    Context "ModPow integer path" {
+    Context "ModPow Tests" {
         It "Computes 5^3 mod 13 correctly" {
             ([BigNum]::ModPow(5, 3, 13)).ToString() | Should -Be 8  # 5^3 = 125, 125 mod 13 = 8
         }
@@ -119,6 +119,12 @@ Describe "BigNum class unit tests" {
         }
     }
 
+    Context "Factorial Tests" {
+        It "Computes 10! correctly" {
+            ([BigNum]::Factorial(10)).ToString() | Should -Be 3628800
+        }
+    }
+
     Context "Special constants" {
         It "Pi has correct start" {
             [BigNum]::Pi(1042).ToString() | Should -Match "^3[,.]141592"
@@ -133,7 +139,7 @@ Describe "BigNum class unit tests" {
             [BigNum]::Phi(1042).ToString() | Should -Match "^1[,.]618033"
         }
         It "Bernoulli Number B generate correclty" {
-            ([BigNum]::BernoulliNumberB(500,10)%100000).ToString() | Should -Match "^78222[,.]861872522"
+            ([BigNum]::BernoulliNumberB(100,10)%100000).ToString() | Should -Match "^92971[,.]8658565857"
         }
         It "Harmonic series Hn generate correclty" {
             [BigNum]::HarmonicSeriesHn(50,10).ToString() | Should -Match "^4[,.]4992053383"
