@@ -955,12 +955,19 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		if ($value -lt 0) {
 			throw "[BigNum]::Factorial() error: n must be >= 0."
 		}
-		if ($value -le 1) {
-			return [BigNum]::parse("1")
+		if (($value -eq 1) -or ($value -eq 0)) {
+			return ([BigNum]1).CloneWithNewRes($value.maxDecimalResolution)
 		}
 
 		if ($value.HasDecimals()) {
-			throw "[BigNum]::Factorial() error: n must be an integer for now"
+			# Non-integer path: restrict to x > -1 (=> z=x+1 > 0). Reflection not yet supported.
+			if ($value -le -1) {
+				throw "[BigNum]::Factorial() error: value <= -1 and non-integer (Gamma pole); not supported yet."
+			}
+
+			# x! = Gamma(x+1)
+			$zp1 = ($value + 1).CloneWithNewRes($value.maxDecimalResolution)
+			return [BigNum]::GammaPos($zp1).Truncate($value.maxDecimalResolution).CloneWithAdjustedResolution()
 		}
 
 		# Product 2..n (1 doesn't change)
@@ -987,6 +994,63 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		[System.Numerics.BigInteger]$left  = [BigNum]::FactorialIntMulRange($lo,  $mid)
 		[System.Numerics.BigInteger]$right = [BigNum]::FactorialIntMulRange($mid+1,$hi)
 		return $left * $right
+	}
+
+	# GammaPos : Compute the value of the Gamma function at $z.
+	hidden static [BigNum] GammaPos( [BigNum] $z ){
+
+		# $res = $z.maxDecimalResolution + 20
+
+		$wrkRes = (([BigNum]$z.maxDecimalResolution)*1.1).Ceiling(0).Int()+5
+
+		$targetResolution = $z.maxDecimalResolution
+
+		# # working precision guard: requested + ceil(log10(z)) + margin
+		# [BigNum]$zScratch = $z.CloneWithNewRes($res)
+		# [BigNum]$log10z   = [BigNum]::Log(10, $zScratch)
+		# [System.Numerics.BigInteger]$guard = $log10z.Ceiling(0).Int() + 30
+		# if ($guard -lt 20) { $guard = 30 }
+		# [System.Numerics.BigInteger]$wrk = $res + $guard
+		# [System.Numerics.BigInteger]$lnWrk = $wrk * 2
+
+		$lnG = [BigNum]::LnGammaPos($z.CloneWithNewRes($wrkRes))
+		$G   = [BigNum]::Exp($lnG)
+		return $G.Truncate($targetResolution)
+	}
+
+	# LnGammaPos : INTERNAL USE. Compute the Log base e of the Gamma function.
+	hidden static [BigNum] LnGammaPos([BigNum] $z ){
+		if ($z -le 0) {
+			throw "[BigNum]::LnGammaPos(): z must be > 0 (reflection not yet implemented)."
+		}
+		if ($z.IsInteger()) {
+			throw "[BigNum]::LnGammaPos(): z must not be an integer."
+		}
+
+
+		[System.Numerics.BigInteger] $wrkRes = $z.maxDecimalResolution + 10
+		[System.Numerics.BigInteger] $targetResolution = $z.maxDecimalResolution
+		# [System.Numerics.BigInteger] $targetRes = $z.maxDecimalResolution + 5
+
+		# Pick Spouge parameter a
+        [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($wrkRes)
+
+		# Series S = c₀ + Σ_{k=1}^{a-1} c_k / (x-1+k)
+        [BigNum] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$wrkRes)
+        for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
+            [BigNum] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$wrkRes)
+            [BigNum] $den  = $z - 1 + $k
+            $S += ($ck / $den)
+        }
+
+		# Main terms
+        $term1 = ($z - 0.5) * [BigNum]::Ln(($z + $selectedA - 1).CloneWithNewRes($wrkRes))
+        $term2 = (-($z + $selectedA - 1)).CloneWithNewRes($wrkRes)
+        $term3 = [BigNum]::Ln($S.CloneWithNewRes($wrkRes))
+
+		$LnGammaResult = ($term1 + $term2 + $term3)
+
+		return $LnGammaResult.Truncate($targetResolution)
 	}
 
 	#endregion static Operators and Methods
@@ -1511,12 +1575,6 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 				[BigNum] $result = ([BigNum]::new([System.Numerics.BigInteger]$entry.num).CloneWithNewRes($res) / [BigNum]::new([System.Numerics.BigInteger]$entry.den).CloneWithNewRes($res)).CloneWithNewRes($res)
 			}
 		}
-		
-		# if(![BigNum]::BernoulliTbl.ContainsKey($n)){ throw "Bernoulli B$n not in table" }
-		# $e = [BigNum]::BernoulliTbl[$n]
-		# $num = [BigNum]::new([System.Numerics.BigInteger]$e.num).CloneWithNewRes($res)
-		# $den = [BigNum]::new([System.Numerics.BigInteger]$e.den).CloneWithNewRes($res)
-		# return ($num / $den).CloneWithNewRes($res)
 
 		return $result
 	}
@@ -1593,6 +1651,51 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		$sum += $csum
 		return $sum.Truncate($res).CloneWithNewRes($res)
 	}
+
+	# SpougeCoefficient: Spouge Coefficient generator
+	static [BigNum] SpougeCoefficient([System.Numerics.BigInteger] $k, [System.Numerics.BigInteger] $a, [System.Numerics.BigInteger] $resolution) {
+		if ($a -lt 3) {
+			throw "error in [BigNum]::SpougeCoefficient : a must be equal or greater than 3"
+		}
+		if ($k -lt 0) {
+			throw "error in [BigNum]::SpougeCoefficient : k must be positive"
+		}
+		if($k -ge $a){
+			throw "error in [BigNum]::SpougeCoefficient : k must be strictly smaller than a"
+		}
+
+		# Resolution
+		$wrkRes = $resolution + 10
+
+		# Sqrt(2*Pi)
+		$ConstSqrt2Pi = ([BigNum]::Sqrt([BigNum]::Tau($wrkRes+5)))
+
+		if ($k -eq 0) {
+			return $ConstSqrt2Pi
+			# return (([BigNum]::new(1).CloneWithNewRes($resolution) / $ConstSqrt2Pi).Truncate($resolution))
+			# return (([BigNum]::new(1).CloneWithNewRes($resolution)).Truncate($resolution))
+		}
+
+		$bnA     = ([BigNum]$a).CloneWithNewRes($wrkRes)
+        $bnK     = ([BigNum]$k).CloneWithNewRes($wrkRes)
+
+		$powPart = [BigNum]::Pow(($bnA - $bnK), ($bnK - 0.5))
+        $expPart = [BigNum]::Exp(($bnA - $bnK))
+        $fact    = [BigNum]::Factorial(($k - 1)).CloneWithNewRes($wrkRes)
+        $sign    = ((($k % 2) -eq 1) ? (([BigNum]1).CloneWithNewRes($wrkRes)) : (([BigNum]-1).CloneWithNewRes($wrkRes)))
+
+        $ck = ($sign * $powPart * $expPart) / $fact
+
+		return $ck.Truncate($resolution)
+	}
+
+    # SpouseChooseA: INTERNAL USE. Heuristic a depending on the number of digits requested
+    hidden static [System.Numerics.BigInteger] SpouseChooseA([System.Numerics.BigInteger] $resolutions) {
+        $ln2pi = [BigNum]::Ln(([BigNum]2).CloneWithNewRes($resolutions) * [BigNum]::Pi($resolutions))
+		$ln10  = [BigNum]::Ln(10)
+        $aEst  = (((([BigNum]$resolutions).CloneWithNewRes($resolutions) * $ln10) / $ln2pi).Ceiling(0) + ([BigNum]10)).Int()
+		return [BigNum]::Max($aEst, 10).Int()
+    }
 
 	# ReciprocalPow : INTERNAL USE. Returns the value of 1/N^p at $res resolution.
 	hidden static [BigNum] ReciprocalPow([System.Numerics.BigInteger] $N,[int] $p,[System.Numerics.BigInteger] $res){

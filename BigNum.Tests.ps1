@@ -123,6 +123,9 @@ Describe "BigNum class unit tests" {
         It "Computes 10! correctly" {
             ([BigNum]::Factorial(10)).ToString() | Should -Be 3628800
         }
+        It "Computes (5.5)! with 10 digits correctly" {
+            ([BigNum]::Factorial(([BigNum]5.5).CloneWithNewRes(10))).ToString() | Should -Match "^287[,.]885277815"
+        }
     }
 
     Context "Special constants" {
