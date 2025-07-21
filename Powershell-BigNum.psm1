@@ -1065,6 +1065,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	#region static Trigonometry Methods
 
+	# Sin: Sinus Function.
 	static [BigNum] Sin([BigNum] $val) {
 		
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
@@ -1083,7 +1084,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		[BigNum] $x2 = $sum * $sum
 		[System.Numerics.BigInteger] $n = 1
 
-		[BigNum] $target = $constOne * [BigNum]::PowTen($wrkRes * -1)
+		[BigNum] $target = [BigNum]::PowTen(-$wrkRes)
 
 		while ($true) {
 			$term *= $constMinusOne * $x2
@@ -1098,6 +1099,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return $sum.Truncate($targetRes)
 	}
 
+	# Cos: Cosine Function.
 	static [BigNum] Cos([BigNum] $val) {
 		
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
@@ -1117,7 +1119,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		[BigNum] $x2 = $x * $x
 		[System.Numerics.BigInteger] $n = 1
 
-		[BigNum] $target = $constOne * [BigNum]::PowTen($wrkRes * -1)
+		[BigNum] $target = [BigNum]::PowTen(-$wrkRes)
 
 		while ($true) {
 			$term *= $constMinusOne * $x2
@@ -1132,6 +1134,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return $sum.Truncate($targetRes)
 	}
 
+	# Tan: Tangent Function.
 	static [BigNum] Tan([BigNum] $val) {
 
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
@@ -1143,13 +1146,129 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		# if (cosX.Abs() -lt [BigNum]::PowTen(-x.maxDecimalResolution + 2)) {
 		# 	throw "Tan(x) undefined: Cos(x) too close to zero."
 		# }
-		
+
 		if($cosX.IsNull()) {
 			throw "Tan(x) undefined: Cos(x) is null."
 		}
 
 
 		return ($sinX / $cosX).CloneWithNewResolution($targetRes)
+	}
+
+	# Arcsin: Arcsinus Function.
+	static [BigNum] Arcsin([BigNum] $val) {
+		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
+		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
+
+		[BigNum] $absVal = $val.Abs().CloneWithNewResolution($wrkRes)
+		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
+		[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
+		[BigNum] $piOver2 = [BigNum]::Pi($wrkRes) / $constTwo
+
+		if ($absVal -gt $constOne) {
+			throw "Arcsin undefined for |x| > 1"
+		}
+
+		if ($absVal -eq $constOne) {
+			return ($val.IsStrictlyNegative() ? -$piOver2 : $piOver2).Truncate($targetRes)
+		}
+
+		[BigNum] $oneMinusXSquared = $constOne - ($tmpVal * $tmpVal)
+		[BigNum] $sqrtTerm = [BigNum]::Sqrt($oneMinusXSquared)
+		[BigNum] $ratio = $tmpVal / $sqrtTerm
+		[BigNum] $result = [BigNum]::Arctan($ratio)
+
+		return $result.Truncate($targetRes)
+	}
+
+	# Arccos: Arccosinus Function.
+	static [BigNum] Arccos([BigNum] $val) {
+		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
+		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
+
+		[BigNum] $piOver2 = [BigNum]::Pi($wrkRes) / ([BigNum]"2").CloneWithNewResolution($wrkRes)
+		[BigNum] $arcsin = [BigNum]::Arcsin($val.CloneWithNewResolution($wrkRes))
+		[BigNum] $result = $piOver2 - $arcsin
+
+		return $result.Truncate($targetRes)
+	}
+
+	# Arctan: Arctangent Function.
+	static [BigNum] Arctan([BigNum] $val) {
+
+		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
+		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
+
+		[BigNum] $absVal = $val.Abs().CloneWithNewResolution($wrkRes)
+		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+		[BigNum] $threshold = ([BigNum]"0.9").CloneWithNewResolution($wrkRes)
+		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
+		[BigNum] $constMinusOne = ([BigNum]"-1").CloneWithNewResolution($wrkRes)
+		[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
+		[BigNum] $piOver2 = [BigNum]::Pi($wrkRes) / $constTwo
+
+		# For |x| > 1
+		if ($absVal -gt $constOne) {
+			# Reduce large x: atan(x) = pi/2 * sign(x) - atan(1/x)
+			[System.Numerics.BigInteger] $wrkReccuring = $wrkRes + 10
+			[BigNum] $invX = $constOne.CloneWithNewResolution($wrkReccuring) / $absVal.CloneWithNewResolution($wrkReccuring)
+			[BigNum] $atanInv = [BigNum]::Arctan($invX)
+			$result = $piOver2.CloneWithNewResolution($wrkReccuring) - $atanInv
+			if ($tmpVal.IsStrictlyNegative()) { $result = -$result }
+			return $result.Truncate($targetRes)
+		}
+
+		# For x near 1, with x < 1
+		if ($absVal -gt $threshold) {
+			[BigNum] $newX = $tmpVal / ($constOne + [BigNum]::Sqrt($constOne + [BigNum]::Pow($tmpVal,$constTwo)))
+			return ($constTwo * [BigNum]::Arctan($newX)).Truncate($targetRes)
+		}
+
+		# Taylor series for |x| <= 1
+		[BigNum] $term = $tmpVal.Clone()
+		[BigNum] $sum = $tmpVal.Clone()
+		[BigNum] $tmpValSquare = $tmpVal * $tmpVal
+		[BigNum] $target = [BigNum]::PowTen(-$wrkRes)
+		[BigNum] $currentSign = $constMinusOne
+		[System.Numerics.BigInteger] $n = 1
+
+		while ($term.Abs() -gt $target) {
+			$n += 2
+			$term = ( $term * $tmpValSquare * ($n - 2) ) / $n
+			$sum += $currentSign * $term
+			$currentSign = -$currentSign
+		}
+
+		return $sum.Truncate($targetRes)
+	}
+
+	# Arctan2: "Arctangent 2" Function, return a quadrant-aware signed value.
+	static [BigNum] Arctan2([BigNum] $y, [BigNum] $x) {
+
+		[System.Numerics.BigInteger] $targetRes = ([BigNum]::Max($y.maxDecimalResolution, $x.maxDecimalResolution)).Int()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
+
+		[BigNum] $constZero = ([BigNum]"0").CloneWithNewResolution($wrkRes)
+		[BigNum] $constPi = [BigNum]::Pi($wrkRes)
+		[BigNum] $constPiOverTwo = $constPi / ([BigNum]"2").CloneWithNewResolution($wrkRes)
+
+		if ($x.IsNull()) {
+			if ($y.IsNull()) { return $constZero.Truncate($targetRes) }
+			return ($y.IsStrictlyPositive() ? $constPiOverTwo : -$constPiOverTwo).Truncate($targetRes)
+		}
+
+		[BigNum] $arctan = [BigNum]::Arctan(($y.CloneWithNewResolution($wrkRes) / $x.CloneWithNewResolution($wrkRes)))
+
+		if ($x.IsStrictlyPositive()) {
+			return $arctan.Truncate($targetRes)
+		}
+		elseif ($y.IsStrictlyPositive()) {
+			return ($arctan + $constPi).Truncate($targetRes)
+		}
+		else {
+			return ($arctan - $constPi).Truncate($targetRes)
+		}
 	}
 
 	#region static Trigonometry Methods

@@ -130,13 +130,25 @@ Describe "BigNum class unit tests" {
 
     Context "Trigonometry Tests" {
         It "Computes Sin(-5.23) correctly" {
-            ([BigNum]::Sin(([BigNum]"-5.23").CloneWithNewResolution(10))).ToString() | Should -Match "^0[,.]869003739"
+            [BigNum]::Sin("-5.23").Truncate(10).ToString() | Should -Match "^0[,.]869003739"
         }
         It "Computes Cos(-5.23) correctly" {
-            ([BigNum]::Cos(([BigNum]"-5.23").CloneWithNewResolution(10))).ToString() | Should -Match "^0[,.]4948055189"
+            [BigNum]::Cos("-5.23").Truncate(10).ToString() | Should -Match "^0[,.]4948055189"
         }
         It "Computes Tan(-5.23) correctly" {
-            ([BigNum]::Tan(([BigNum]"-5.23").CloneWithNewResolution(10))).ToString() | Should -Match "^1[,.]7562531253"
+            [BigNum]::Tan("-5.23").Truncate(10).ToString() | Should -Match "^1[,.]7562531253"
+        }
+        It "Computes Arcsin(0.84) correctly" {
+            [BigNum]::Arcsin("0.84").Truncate(10).ToString() | Should -Match "^0[,.]9972832223"
+        }
+        It "Computes Arccos(-0.42) correctly" {
+            [BigNum]::Arccos("-0.42").Truncate(10).ToString() | Should -Match "^2[,.]0042416468"
+        }
+        It "Computes Arctan(-5.23) correctly" {
+            [BigNum]::Arctan("5.23").Truncate(10).ToString() | Should -Match "^1[,.]3818720191"
+        }
+        It "Computes Arctan2(0.001,-1.001) correctly" {
+            ([BigNum]::Arctan2([BigNum]"0.001",[BigNum]"-1.001")).Truncate(10).ToString() | Should -Match "^3[,.]1405936529"
         }
     }
 
