@@ -966,22 +966,13 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Factorial : Returns $value Factorial. Internaly calls FactorialIntMulRange.
 	static [BigNum] Factorial([BigNum] $value) {
-		if ($value -lt 0) {
-			throw "[BigNum]::Factorial() error: n must be >= 0."
-		}
 		if (($value -eq 1) -or ($value -eq 0)) {
 			return ([BigNum]1).CloneWithNewResolution($value.maxDecimalResolution)
 		}
 
-		if ($value.HasDecimals()) {
-			# Non-integer path: restrict to x > -1 (=> z=x+1 > 0). Reflection not yet supported.
-			if ($value -le -1) {
-				throw "[BigNum]::Factorial() error: value <= -1 and non-integer (Gamma pole); not supported yet."
-			}
-
-			# x! = Gamma(x+1)
+		if ($value.HasDecimals() -or $value.IsStrictlyNegative()) {
 			$zp1 = ($value + 1).CloneWithNewResolution($value.maxDecimalResolution)
-			return [BigNum]::GammaPos($zp1).Truncate($value.maxDecimalResolution).CloneWithAdjustedResolution()
+			return [BigNum]::Gamma($zp1).Truncate($value.maxDecimalResolution).CloneWithAdjustedResolution()
 		}
 
 		# Product 2..n (1 doesn't change)
@@ -1010,7 +1001,21 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return $left * $right
 	}
 
-	# GammaPos : Compute the value of the Gamma function at $z.
+	# Gamma : Compute the value of the Gamma function for z.
+	static [BigNum] Gamma( [BigNum] $z ){
+		# integers ≤ 0  →  poles
+		if ($z.IsInteger() -and $z.IsNegative()) {
+			throw "[BigNum]::Gamma(): pole at negative or null integer z"
+		}
+
+		if ($z -le 0) {
+			return [BigNum]::GammaNeg($z)
+		}
+
+		return [BigNum]::GammaPos($Z)
+	}
+
+	# GammaPos : INTERNAL USE. Compute the value of the Gamma function for positive $z.
 	hidden static [BigNum] GammaPos( [BigNum] $z ){
 
 		# $res = $z.maxDecimalResolution + 20
@@ -1018,6 +1023,10 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		$wrkRes = (([BigNum]$z.maxDecimalResolution)*1.1).Ceiling(0).Int()+10
 
 		$targetResolution = $z.maxDecimalResolution
+
+		if ($z.IsInteger()) {
+			return [BigNum]::Factorial($z-1).Truncate($targetResolution)
+		}
 
 		$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($wrkRes))
 		$G   = [BigNum]::Exp($lnG)
@@ -1057,6 +1066,33 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		$LnGammaResult = ($term1 + $term2 + $term3)
 
 		return $LnGammaResult.Truncate($targetResolution)
+	}
+
+	# GammaNeg : INTERNAL USE. Compute the value of the Gamma function for negative z.
+	hidden static [BigNum] GammaNeg( [BigNum] $z ){
+
+		# ---------- reflection branch (z < 0) ----------------------
+		# working precision: requested + 10 guard digits
+		[System.Numerics.BigInteger] $wrk = $z.getMaxDecimalResolution() + 10
+		# [bigint] $targetRes = $z.getMaxDecimalResolution()
+		[BigNum] $tmpZ = $z.CloneWithNewResolution($wrk)
+
+		# sin(π z)
+		[BigNum] $adaptPi    = [BigNum]::Pi($wrk+5)
+		[BigNum] $sinPZ = [BigNum]::Sin($adaptPi * $tmpZ)  # you said sin works
+
+		# if sin(πz) too small, raise guard digits automatically
+		if ($sinPZ.Abs() -lt [BigNum]::PowTen(-($wrk+5))) {
+			$wrk += 20         # adaptive bump
+			[BigNum] $adaptPi    = [BigNum]::Pi($wrk+5)
+			$sinPZ  = [BigNum]::Sin($adaptPi * $tmpZ)
+		}
+
+		[BigNum] $oneMinusZ = ( [BigNum]::new(1).CloneWithNewResolution($wrk) - $tmpZ )
+		[BigNum] $gamma1mz  = [BigNum]::GammaPos($oneMinusZ)            # positive argument
+
+		[BigNum] $result = ( $adaptPi / $sinPZ ) / $gamma1mz
+		return $result.Clone()
 	}
 
 	#endregion static Operators and Methods
