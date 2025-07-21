@@ -124,7 +124,19 @@ Describe "BigNum class unit tests" {
             ([BigNum]::Factorial(10)).ToString() | Should -Be 3628800
         }
         It "Computes (5.5)! with 10 digits correctly" {
-            ([BigNum]::Factorial(([BigNum]5.5).CloneWithNewRes(10))).ToString() | Should -Match "^287[,.]885277815"
+            ([BigNum]::Factorial(([BigNum]5.5).CloneWithNewResolution(10))).ToString() | Should -Match "^287[,.]885277815"
+        }
+    }
+
+    Context "Trigonometry Tests" {
+        It "Computes Sin(-5.23) correctly" {
+            ([BigNum]::Sin(([BigNum]"-5.23").CloneWithNewResolution(10))).ToString() | Should -Match "^0[,.]869003739"
+        }
+        It "Computes Cos(-5.23) correctly" {
+            ([BigNum]::Cos(([BigNum]"-5.23").CloneWithNewResolution(10))).ToString() | Should -Match "^0[,.]4948055189"
+        }
+        It "Computes Tan(-5.23) correctly" {
+            ([BigNum]::Tan(([BigNum]"-5.23").CloneWithNewResolution(10))).ToString() | Should -Match "^1[,.]7562531253"
         }
     }
 

@@ -324,19 +324,19 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return [BigNum]::new($val)
 	}
 
-	# CloneWithNewRes : returns a new instance of BigNum with the maximum resolution altered.
-	[BigNum] CloneWithNewRes([System.Numerics.BigInteger] $newResolution) {
+	# CloneWithNewResolution : returns a new instance of BigNum with the maximum resolution altered, Trucate if needed.
+	[BigNum] CloneWithNewResolution([System.Numerics.BigInteger] $newResolution) {
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$this.negativeFlag,$newResolution)
 	}
 
-	# CloneWithStandardRes : returns a new instance of BigNum with the maximum resolution set to the default one.
-	[BigNum] CloneWithStandardRes([System.Numerics.BigInteger] $newResolution) {
+	# CloneWithStandardResolution : returns a new instance of BigNum with the maximum resolution set to the default one.
+	[BigNum] CloneWithStandardResolution([System.Numerics.BigInteger] $newResolution) {
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$this.negativeFlag,[BigNum]::defaultMaxDecimalResolution)
 	}
 
 	# CloneWithAdjustedResolution : returns a new instance of BigNum with the maximum resolution set to the current length of the decimal expansion.
 	[BigNum] CloneWithAdjustedResolution(){
-		return $this.CloneWithNewRes($this.shiftVal)
+		return $this.CloneWithNewResolution($this.shiftVal)
 	}
 
 	# CloneWithAddedResolution : returns a new instance of BigNum with the maximum resolution set to the current length of the decimal expansion.
@@ -346,7 +346,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			throw "Error in [BigNum]::AddDecimals : ${val} must be positive"
 		}
 
-		return $this.CloneWithNewRes($this.maxDecimalResolution + $val)
+		return $this.CloneWithNewResolution($this.maxDecimalResolution + $val)
 	}
 
 	# CloneAndReducePrecisionBy : returns a new instance of BigNum with the maximum resolution reduiced by $length and the number rounded if needed.
@@ -529,7 +529,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		[System.Numerics.BigInteger]$newDecimalResolution = [System.Numerics.BigInteger]::Max($a.maxDecimalResolution,$b.maxDecimalResolution)
 		[System.Numerics.BigInteger]$tmpDiv = [BigNum]::EuclideanDiv($tmpA,$tmpB)
 		[BigNum]$tmpResult = $tmpA - ($tmpB*$([BigNum]::CloneFromObject($tmpDiv)))
-		return $tmpResult.CloneWithNewRes($newDecimalResolution)
+		return $tmpResult.CloneWithNewResolution($newDecimalResolution)
 	}
 
 	# op_LeftShift : Standard overload for the "<<" operator.
@@ -559,6 +559,59 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# -bnot   op_OnesComplement
 
 	#endregion Base Operators
+
+
+
+	#region internals private methods
+
+	# EstimateTaylorTermsForLn : INTERNAL USE. Returns the number of iteration required for the Taylor series in the Ln function.
+	hidden static [System.Numerics.BigInteger] EstimateTaylorTermsForLn([BigNum] $x, [System.Numerics.BigInteger] $decimalLength) {
+		[System.Numerics.BigInteger] $n = 1
+		[System.Numerics.BigInteger] $targetDecimalLength = [System.Numerics.BigInteger]::Max($decimalLength,$x.maxDecimalResolution)+10
+		[BigNum] $targetEpsilon = [BigNum]::new("1",$targetDecimalLength,$false,$targetDecimalLength)
+		[BigNum] $currentPower = $x.CloneWithNewResolution($targetDecimalLength)
+
+		while (($currentPower.Abs() / $n) -gt $targetEpsilon) {
+			$n += 1
+			$currentPower *= $x
+		}
+
+		return $n
+	}
+
+	# EstimateTaylorTermsForExp : INTERNAL USE. Returns the number of iteration required for the Taylor series in the Exp function.
+	hidden static [System.Numerics.BigInteger] EstimateTaylorTermsForExp([BigNum] $x, [System.Numerics.BigInteger] $decimalLength) {
+		#This function requires a scaled $x value
+		[System.Numerics.BigInteger] $n = 1
+		[System.Numerics.BigInteger] $targetDecimalLength = [System.Numerics.BigInteger]::Max($decimalLength,$x.maxDecimalResolution)+10
+		[BigNum] $absX = $x.Abs().CloneWithNewResolution($targetDecimalLength)
+		[BigNum] $term = $absX.CloneWithNewResolution($targetDecimalLength)
+		[BigNum] $factorial = [BigNum]::CloneFromObject("1").CloneWithNewResolution($targetDecimalLength)
+		[BigNum] $targetEpsilon = [BigNum]::new(1,$decimalLength,$false,$targetDecimalLength)
+		[System.Numerics.BigInteger] $hardLimit = 10000
+
+		while ((($term / $factorial) -gt $targetEpsilon) -and ($n -lt $hardLimit)) {
+			$n += 1
+			$term *= $absX
+			$factorial *= [BigNum]::CloneFromObject($n).CloneWithNewResolution($targetDecimalLength)
+		}
+
+		if ($n -ge $hardLimit) {
+			throw "[BigNum]::EstimateTaylorTermsForExp reached hard limit ($hardLimit) without convergence"
+		}
+
+		return $n
+	}
+
+	# SpouseChooseA: INTERNAL USE. Heuristic a depending on the number of digits requested
+    hidden static [System.Numerics.BigInteger] SpouseChooseA([System.Numerics.BigInteger] $resolutions) {
+        $ln2pi = [BigNum]::Ln(([BigNum]2).CloneWithNewResolution($resolutions) * [BigNum]::Pi($resolutions))
+		$ln10  = [BigNum]::Ln(10)
+        $aEst  = (((([BigNum]$resolutions).CloneWithNewResolution($resolutions) * $ln10) / $ln2pi).Ceiling(0) + ([BigNum]10)).Int()
+		return [BigNum]::Max($aEst, 10).Int()
+    }
+
+	#endregion internals private methods
 
 
 
@@ -592,45 +645,6 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return ($tmpA/$tmpB).Floor(0).Int()
 	}
 
-	# EstimateTaylorTermsForLn : INTERNAL USE. Returns the number of iteration required for the Taylor series in the Ln function.
-	hidden static [System.Numerics.BigInteger] EstimateTaylorTermsForLn([BigNum] $x, [System.Numerics.BigInteger] $decimalLength) {
-		[System.Numerics.BigInteger] $n = 1
-		[System.Numerics.BigInteger] $targetDecimalLength = [System.Numerics.BigInteger]::Max($decimalLength,$x.maxDecimalResolution)+10
-		[BigNum] $targetEpsilon = [BigNum]::new("1",$targetDecimalLength,$false,$targetDecimalLength)
-		[BigNum] $currentPower = $x.CloneWithNewRes($targetDecimalLength)
-
-		while (($currentPower.Abs() / $n) -gt $targetEpsilon) {
-			$n += 1
-			$currentPower *= $x
-		}
-
-		return $n
-	}
-
-	# EstimateTaylorTermsForExp : INTERNAL USE. Returns the number of iteration required for the Taylor series in the Exp function.
-	hidden static [System.Numerics.BigInteger] EstimateTaylorTermsForExp([BigNum] $x, [System.Numerics.BigInteger] $decimalLength) {
-		#This function requires a scaled $x value
-		[System.Numerics.BigInteger] $n = 1
-		[System.Numerics.BigInteger] $targetDecimalLength = [System.Numerics.BigInteger]::Max($decimalLength,$x.maxDecimalResolution)+10
-		[BigNum] $absX = $x.Abs().CloneWithNewRes($targetDecimalLength)
-		[BigNum] $term = $absX.CloneWithNewRes($targetDecimalLength)
-		[BigNum] $factorial = [BigNum]::CloneFromObject("1").CloneWithNewRes($targetDecimalLength)
-		[BigNum] $targetEpsilon = [BigNum]::new(1,$decimalLength,$false,$targetDecimalLength)
-		[System.Numerics.BigInteger] $hardLimit = 10000
-
-		while ((($term / $factorial) -gt $targetEpsilon) -and ($n -lt $hardLimit)) {
-			$n += 1
-			$term *= $absX
-			$factorial *= [BigNum]::CloneFromObject($n).CloneWithNewRes($targetDecimalLength)
-		}
-
-		if ($n -ge $hardLimit) {
-			throw "[BigNum]::EstimateTaylorTermsForExp reached hard limit ($hardLimit) without convergence"
-		}
-
-		return $n
-	}
-
 	# Ln : Returns the Natural Logarithm (Logarithme Neperien) in base e for $value.
 	static [BigNum] Ln([BigNum] $value) {
 		# Trap illegal values
@@ -640,9 +654,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		$tmpResolution = $value.maxDecimalResolution + 100
 		
-		[BigNum] $tmpVal = $value.CloneWithNewRes($tmpResolution)
-		[BigNum] $tmpOne = [BigNum]::new("1.0").CloneWithNewRes($tmpResolution)
-		[BigNum] $tmpQuarter = [BigNum]::new("0.25").CloneWithNewRes($tmpResolution)
+		[BigNum] $tmpVal = $value.CloneWithNewResolution($tmpResolution)
+		[BigNum] $tmpOne = [BigNum]::new("1.0").CloneWithNewResolution($tmpResolution)
+		[BigNum] $tmpQuarter = [BigNum]::new("0.25").CloneWithNewResolution($tmpResolution)
 		[System.Numerics.BigInteger] $powerAdjust = [System.Numerics.BigInteger]::Parse(0);
 
 		# Confine x to a sensible range
@@ -658,9 +672,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		# Now use the Taylor series to calculate the logarithm
 		$tmpVal -= 1
 		[System.Numerics.BigInteger] $TAYLOR_ITERATIONS = [BigNum]::EstimateTaylorTermsForLn($tmpVal,$tmpResolution)
-		[BigNum] $tmpT = [BigNum]::new(0).CloneWithNewRes($tmpResolution)
-		[BigNum] $tmpS = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		[BigNum] $tmpZ = $tmpVal.CloneWithNewRes($tmpResolution)
+		[BigNum] $tmpT = [BigNum]::new(0).CloneWithNewResolution($tmpResolution)
+		[BigNum] $tmpS = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		[BigNum] $tmpZ = $tmpVal.CloneWithNewResolution($tmpResolution)
 
 		for ([BigNum]$k = 1; $k -le $TAYLOR_ITERATIONS; $k += 1) {
 			$tmpT += $tmpZ * $tmpS / $k
@@ -669,7 +683,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		}
 		
 		# Combine the result with the power_adjust value and return
-		return [BigNum]::new($tmpT+$powerAdjust).Truncate($value.maxDecimalResolution).CloneWithNewRes($value.maxDecimalResolution)
+		return [BigNum]::new($tmpT+$powerAdjust).Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
 	}
 
 	# Exp : Returns the value of e to the power $exponent.
@@ -682,7 +696,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		[BigNum] $absX = $exponent.Abs()
 		[System.Numerics.BigInteger] $k = 0
-		$constTwo = ([BigNum]2).CloneWithNewRes($tmpResolution)
+		$constTwo = ([BigNum]2).CloneWithNewResolution($tmpResolution)
 
 		# Find k such that |x / 2^k| < threshold
 		while ($absX -gt $threshold) {
@@ -694,13 +708,13 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		$scaledX = $exponent / [BigNum]::new([System.Numerics.BigInteger]::Pow(2, $k))
 		$numTerms = [BigNum]::EstimateTaylorTermsForExp($scaledX, $tmpResolution)
 
-		[BigNum] $result = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		[BigNum] $term = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		[BigNum] $factorial = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
+		[BigNum] $result = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		[BigNum] $term = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		[BigNum] $factorial = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
 
 		for ([System.Numerics.BigInteger] $n = 1; $n -le $numTerms; $n += 1) {
 			$term *= $scaledX
-			$factorial *= [BigNum]::new($n).CloneWithNewRes($tmpResolution)
+			$factorial *= [BigNum]::new($n).CloneWithNewResolution($tmpResolution)
 			$result += $term / $factorial
 		}
 
@@ -709,7 +723,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			$result *= $result
 		}
 
-		return $result.Clone().Truncate($exponent.maxDecimalResolution).CloneWithNewRes($exponent.maxDecimalResolution)
+		return $result.Clone().Truncate($exponent.maxDecimalResolution).CloneWithNewResolution($exponent.maxDecimalResolution)
 	}
 
 	# Log : Returns the Logarithm in base $base for $value.
@@ -724,10 +738,10 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		$targetResolution = ([BigNum]::Max($value.maxDecimalResolution,$base.maxDecimalResolution)).Int()
 		$tmpResolutionPlus = $targetResolution + 100
 
-		[BigNum] $lnValue = [BigNum]::Ln($value.CloneWithNewRes($tmpResolutionPlus))
-		[BigNum] $lnBase = [BigNum]::Ln($base.CloneWithNewRes($tmpResolutionPlus))
+		[BigNum] $lnValue = [BigNum]::Ln($value.CloneWithNewResolution($tmpResolutionPlus))
+		[BigNum] $lnBase = [BigNum]::Ln($base.CloneWithNewResolution($tmpResolutionPlus))
 
-		return [BigNum]::new($lnValue / $lnBase).Truncate($targetResolution).CloneWithNewRes($targetResolution)
+		return [BigNum]::new($lnValue / $lnBase).Truncate($targetResolution).CloneWithNewResolution($targetResolution)
 	}
 
 	# Pow : Returns the value of $value to the power $exponent. Dispaches to PowTen, PowTenPositive, PowInt, and PowFloat as needed.
@@ -809,17 +823,17 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		}
 
 		$tmpResolution = $value.maxDecimalResolution + 10
-		$tmpValue = $value.CloneWithNewRes($tmpResolution)
-		$constOne = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
+		$tmpValue = $value.CloneWithNewResolution($tmpResolution)
+		$constOne = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
 
 		# Initial guess: S / 2 or 1 if S < 1
     	# [BigNum] $x = ($tmpValue -lt $constOne) ? $constOne.clone() : ($tmpValue / $constTwo)
 		[BigNum] $x = ($tmpValue -lt $constOne) ? ([BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length))) : (($tmpValue.integerVal.ToString().Length%2)?([BigNum]::PowTen(($tmpValue.integerVal.ToString().Length - 1)/2)):([BigNum]::PowTen($tmpValue.integerVal.ToString().Length/2)))
 		# Convergence threshold
-    	[BigNum] $epsilon = [BigNum]::PowTen(-$tmpResolution).CloneWithNewRes($tmpResolution)
+    	[BigNum] $epsilon = [BigNum]::PowTen(-$tmpResolution).CloneWithNewResolution($tmpResolution)
 
 
-		[BigNum] $half = [BigNum]::new(0.5).CloneWithNewRes($tmpResolution)
+		[BigNum] $half = [BigNum]::new(0.5).CloneWithNewResolution($tmpResolution)
     	[BigNum] $diff = $constOne.clone()
 
 		do {
@@ -829,7 +843,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		} while ($diff -gt $epsilon)
 
 		# Return truncated to user-specified resolution
-		return $x.Clone().Truncate($value.maxDecimalResolution).CloneWithNewRes($value.maxDecimalResolution)
+		return $x.Clone().Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
 	}
 
 	# Cbrt : Returns the value of the Cubic Root of $value using the Newton-Raphson algorithm.
@@ -854,22 +868,22 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		}
 
 		$tmpResolution = $value.maxDecimalResolution + 10
-		$tmpValue = $value.CloneWithNewRes($tmpResolution)
+		$tmpValue = $value.CloneWithNewResolution($tmpResolution)
 		$x = [BigNum]::PowTen(0)
 
 		# Initial guess: 10 ^ (numDigits / n)
 		if(($tmpValue -lt 1) -and ($tmpValue -gt -1)){
-			$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).CloneWithNewRes($tmpResolution)
+			$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).CloneWithNewResolution($tmpResolution)
 		} else {
 			$numDigits = [BigNum]::CloneFromObject($tmpValue.integerVal.ToString().Length)
 			$approxExp = $numDigits / $n
-			$x = [BigNum]::PowTen($approxExp.Round(0).Int()).CloneWithNewRes($tmpResolution)
+			$x = [BigNum]::PowTen($approxExp.Round(0).Int()).CloneWithNewResolution($tmpResolution)
 		}
 
 		# Precompute constants
-		$constOne = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		# $constTwo = [BigNum]::new(2).CloneWithNewRes($tmpResolution)
-		$epsilon = [BigNum]::PowTen(5-$tmpResolution).CloneWithNewRes($tmpResolution)
+		$constOne = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		# $constTwo = [BigNum]::new(2).CloneWithNewResolution($tmpResolution)
+		$epsilon = [BigNum]::PowTen(5-$tmpResolution).CloneWithNewResolution($tmpResolution)
 
 		$diff = $x
 		do {
@@ -880,7 +894,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			$diff = ($x - $xPrev).Abs()
 		} while ($diff -gt $epsilon)
 
-		return $x.Truncate($value.maxDecimalResolution).CloneWithNewRes($value.maxDecimalResolution)
+		return $x.Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
 	}
 
 	# NthRootInt : Returns the value of the Nth ($n, being an integer) Root of $value using the Newton-Raphson algorithm.
@@ -895,22 +909,22 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		# Setup high resolution for internal calculations
 		$tmpResolution = $value.maxDecimalResolution + 10
-		$tmpValue = $value.CloneWithNewRes($tmpResolution)
+		$tmpValue = $value.CloneWithNewResolution($tmpResolution)
 		$x = [BigNum]::PowTen(0)
 
 		# Initial guess: 10 ^ floor(numDigits / n)
 		if(($tmpValue -lt 1) -and ($tmpValue -gt -1)){
-			$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).CloneWithNewRes($tmpResolution)
+			$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).CloneWithNewResolution($tmpResolution)
 		} else {
 			$numDigits = $tmpValue.integerVal.ToString().Length
 			$approxExp = $numDigits / $n
-			$x = [BigNum]::PowTen($approxExp).CloneWithNewRes($tmpResolution)
+			$x = [BigNum]::PowTen($approxExp).CloneWithNewResolution($tmpResolution)
 		}
 
 		# Precompute constants
-		$nBig = [BigNum]::new($n).CloneWithNewRes($tmpResolution)
+		$nBig = [BigNum]::new($n).CloneWithNewResolution($tmpResolution)
 		$nMinusOne = $nBig - 1
-		$epsilon = [BigNum]::PowTen(5-$tmpResolution).CloneWithNewRes($tmpResolution)
+		$epsilon = [BigNum]::PowTen(5-$tmpResolution).CloneWithNewResolution($tmpResolution)
 
 		# Newton-Raphson iterations
 		$diff = $x
@@ -922,7 +936,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		} while ($diff -gt $epsilon)
 
 		# Return the value truncated to the requested resolution
-		return $x.Truncate($value.maxDecimalResolution).CloneWithNewRes($value.maxDecimalResolution)
+		return $x.Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
 	}
 
 	# ModPow : Returns the modular exponentiation of $base raisend to the power $exponent modulo $modulus. Calls ModPowPosInt if possible.
@@ -956,7 +970,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			throw "[BigNum]::Factorial() error: n must be >= 0."
 		}
 		if (($value -eq 1) -or ($value -eq 0)) {
-			return ([BigNum]1).CloneWithNewRes($value.maxDecimalResolution)
+			return ([BigNum]1).CloneWithNewResolution($value.maxDecimalResolution)
 		}
 
 		if ($value.HasDecimals()) {
@@ -966,7 +980,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			}
 
 			# x! = Gamma(x+1)
-			$zp1 = ($value + 1).CloneWithNewRes($value.maxDecimalResolution)
+			$zp1 = ($value + 1).CloneWithNewResolution($value.maxDecimalResolution)
 			return [BigNum]::GammaPos($zp1).Truncate($value.maxDecimalResolution).CloneWithAdjustedResolution()
 		}
 
@@ -1001,19 +1015,11 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		# $res = $z.maxDecimalResolution + 20
 
-		$wrkRes = (([BigNum]$z.maxDecimalResolution)*1.1).Ceiling(0).Int()+5
+		$wrkRes = (([BigNum]$z.maxDecimalResolution)*1.1).Ceiling(0).Int()+10
 
 		$targetResolution = $z.maxDecimalResolution
 
-		# # working precision guard: requested + ceil(log10(z)) + margin
-		# [BigNum]$zScratch = $z.CloneWithNewRes($res)
-		# [BigNum]$log10z   = [BigNum]::Log(10, $zScratch)
-		# [System.Numerics.BigInteger]$guard = $log10z.Ceiling(0).Int() + 30
-		# if ($guard -lt 20) { $guard = 30 }
-		# [System.Numerics.BigInteger]$wrk = $res + $guard
-		# [System.Numerics.BigInteger]$lnWrk = $wrk * 2
-
-		$lnG = [BigNum]::LnGammaPos($z.CloneWithNewRes($wrkRes))
+		$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($wrkRes))
 		$G   = [BigNum]::Exp($lnG)
 		return $G.Truncate($targetResolution)
 	}
@@ -1044,9 +1050,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
         }
 
 		# Main terms
-        $term1 = ($z - 0.5) * [BigNum]::Ln(($z + $selectedA - 1).CloneWithNewRes($wrkRes))
-        $term2 = (-($z + $selectedA - 1)).CloneWithNewRes($wrkRes)
-        $term3 = [BigNum]::Ln($S.CloneWithNewRes($wrkRes))
+        $term1 = ($z - 0.5) * [BigNum]::Ln(($z + $selectedA - 1).CloneWithNewResolution($wrkRes))
+        $term2 = (-($z + $selectedA - 1)).CloneWithNewResolution($wrkRes)
+        $term3 = [BigNum]::Ln($S.CloneWithNewResolution($wrkRes))
 
 		$LnGammaResult = ($term1 + $term2 + $term3)
 
@@ -1056,6 +1062,99 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	#endregion static Operators and Methods
 
 	
+
+	#region static Trigonometry Methods
+
+	static [BigNum] Sin([BigNum] $val) {
+		
+		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
+		[BigNum] $constMinusOne = ([BigNum]"-1").CloneWithNewResolution($wrkRes)
+		[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
+		[BigNum] $constTau = [BigNum]::Tau($wrkRes)
+		
+		# Preliminary: reduce x to [-π, π] range
+		[BigNum] $k = ($val / $constTau).Round(0)
+		$term = $val - $k * $constTau
+
+		[BigNum] $sum = $term.Clone()
+		[BigNum] $x2 = $sum * $sum
+		[System.Numerics.BigInteger] $n = 1
+
+		[BigNum] $target = $constOne * [BigNum]::PowTen($wrkRes * -1)
+
+		while ($true) {
+			$term *= $constMinusOne * $x2
+			$term /= [BigNum]::new( ($constTwo*$n) * ($constTwo*$n + $constOne) )
+			$n += 1
+			if ($term.Abs() -lt $target ) {
+				break
+			}
+			$sum += $term
+		}
+
+		return $sum.Truncate($targetRes)
+	}
+
+	static [BigNum] Cos([BigNum] $val) {
+		
+		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
+		[BigNum] $constMinusOne = ([BigNum]"-1").CloneWithNewResolution($wrkRes)
+		[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
+		[BigNum] $constTau = [BigNum]::Tau($wrkRes)
+
+		# Preliminary: reduce x to [-π, π] range
+		[BigNum] $k = ($val / $constTau).Round(0)
+		$x = $val - $k * $constTau
+		$term = $constOne.Clone()
+
+		[BigNum] $sum = $term.Clone()
+		[BigNum] $x2 = $x * $x
+		[System.Numerics.BigInteger] $n = 1
+
+		[BigNum] $target = $constOne * [BigNum]::PowTen($wrkRes * -1)
+
+		while ($true) {
+			$term *= $constMinusOne * $x2
+			$term /= [BigNum]::new( ($constTwo*$n) * ($constTwo*$n - $constOne) )
+			$n += 1
+			if ($term.Abs() -lt $target ) {
+				break
+			}
+			$sum += $term
+		}
+
+		return $sum.Truncate($targetRes)
+	}
+
+	static [BigNum] Tan([BigNum] $val) {
+
+		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		[BigNum] $sinX = [BigNum]::Sin($val.CloneWithNewResolution($wrkRes))
+		[BigNum] $cosX = [BigNum]::Cos($val.CloneWithNewResolution($wrkRes))
+
+		# if (cosX.Abs() -lt [BigNum]::PowTen(-x.maxDecimalResolution + 2)) {
+		# 	throw "Tan(x) undefined: Cos(x) too close to zero."
+		# }
+		
+		if($cosX.IsNull()) {
+			throw "Tan(x) undefined: Cos(x) is null."
+		}
+
+
+		return ($sinX / $cosX).CloneWithNewResolution($targetRes)
+	}
+
+	#region static Trigonometry Methods
+
+
 
 	#region instance Methods
 
@@ -1313,32 +1412,32 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Pi().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::Pi().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedPi.getMaxDecimalResolution()) {
-			return [BigNum]::cachedPi.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedPi.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 5
 
-		$a = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		$b = [BigNum]::new(1).CloneWithNewRes($tmpResolution) / [BigNum]::Sqrt(([BigNum]2).CloneWithNewRes($tmpResolution))
-		$p = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		$t = [BigNum]::new(0.25).CloneWithNewRes($tmpResolution)
+		$a = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		$b = [BigNum]::new(1).CloneWithNewResolution($tmpResolution) / [BigNum]::Sqrt(([BigNum]2).CloneWithNewResolution($tmpResolution))
+		$p = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		$t = [BigNum]::new(0.25).CloneWithNewResolution($tmpResolution)
 
-		$constTwo = [BigNum]::new(2).CloneWithNewRes($tmpResolution)
-		$constFour = [BigNum]::new(4).CloneWithNewRes($tmpResolution)
-		$referenceDiff = [BigNum]::PowTen(-$resolution).CloneWithNewRes($tmpResolution)
+		$constTwo = [BigNum]::new(2).CloneWithNewResolution($tmpResolution)
+		$constFour = [BigNum]::new(4).CloneWithNewResolution($tmpResolution)
+		$referenceDiff = [BigNum]::PowTen(-$resolution).CloneWithNewResolution($tmpResolution)
 
-		$tmpPi = [BigNum]::new(3).CloneWithNewRes($tmpResolution)
-		$diff = [BigNum]::new("0.14").CloneWithNewRes($tmpResolution)
+		$tmpPi = [BigNum]::new(3).CloneWithNewResolution($tmpResolution)
+		$diff = [BigNum]::new("0.14").CloneWithNewResolution($tmpResolution)
 
 		do {
 			$tmpPi_old = $tmpPi
 
 			$a_next = ($a + $b) / $constTwo
-			$b_next = [BigNum]::Sqrt(($a * $b).CloneWithNewRes($tmpResolution))
+			$b_next = [BigNum]::Sqrt(($a * $b).CloneWithNewResolution($tmpResolution))
 			$p_next = $constTwo * $p
 			$t_next = $t - ($p * [BigNum]::Pow($a_next - $a,2))
 
@@ -1351,8 +1450,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			$diff = ($tmpPi - $tmpPi_old).Abs()
 		} while ($diff -gt $referenceDiff)
 
-		[BigNum]::cachedPi = [BigNum]::new([BigNum]$tmpPi).Truncate($resolution).CloneWithNewRes($resolution)
-		[BigNum]::cachedTau = ([BigNum]::cachedPi * 2).Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedPi = [BigNum]::new([BigNum]$tmpPi).Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedTau = ([BigNum]::cachedPi * 2).Truncate($resolution).CloneWithNewResolution($resolution)
 
 		return [BigNum]::cachedPi.Clone()
 	}
@@ -1378,11 +1477,11 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Tau().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::Tau().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedTau.getMaxDecimalResolution()) {
-			return [BigNum]::cachedTau.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedTau.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		[BigNum]::Pi($resolution)
@@ -1412,23 +1511,23 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::e().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::e().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedE.getMaxDecimalResolution()) {
-			return [BigNum]::cachedE.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedE.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
-		[BigNum] $result = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		[BigNum] $factorial = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
+		[BigNum] $result = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		[BigNum] $factorial = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
 
 		for ([System.Numerics.BigInteger]$n = 1; $n -le $tmpResolution; $n += 1) {
 			$factorial *= [BigNum]::new($n)
 			$result += [BigNum]::new(1) / $factorial
 		}
 
-		[BigNum]::cachedE = [BigNum]::new($result).Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedE = [BigNum]::new($result).Truncate($resolution).CloneWithNewResolution($resolution)
 
 		return [BigNum]::cachedE.Clone()
 	}
@@ -1454,19 +1553,19 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Phi().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::Phi().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedPhi.getMaxDecimalResolution()) {
-			return [BigNum]::cachedPhi.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedPhi.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
 
 		# First, define a few high-res constants
-		[BigNum] $constOne = [BigNum]::new(1).CloneWithNewRes($tmpResolution)
-		[BigNum] $constTwo = [BigNum]::new(2).CloneWithNewRes($tmpResolution)
-		[BigNum] $constFive = [BigNum]::new(5).CloneWithNewRes($tmpResolution)
+		[BigNum] $constOne = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		[BigNum] $constTwo = [BigNum]::new(2).CloneWithNewResolution($tmpResolution)
+		[BigNum] $constFive = [BigNum]::new(5).CloneWithNewResolution($tmpResolution)
 
 		# Then, get the square root of 5
 		[BigNum] $constSqrt5 = [BigNum]::Sqrt($constFive)
@@ -1475,7 +1574,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		[BigNum] $tmpPhi = ($constOne + $constSqrt5) / $constTwo
 		
 		# Store at the new resolution
-		[BigNum]::cachedPhi = $tmpPhi.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedPhi = $tmpPhi.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedPhi.Clone()
@@ -1553,26 +1652,26 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			throw "[BigNum]::BernoulliNumberB(): n must be >= 0."
 		}
 
-		[BigNum] $result = [BigNum]::new(0).CloneWithNewRes($res)
+		[BigNum] $result = [BigNum]::new(0).CloneWithNewResolution($res)
 
 		switch ($n) {
 			0 {
-				return [BigNum]::new(1).CloneWithNewRes($res)
+				return [BigNum]::new(1).CloneWithNewResolution($res)
 			}
 			1 {
 				# B1 = -1/2 in Euler–Maclaurin
-				return ([BigNum]::new(-1).CloneWithNewRes($res) /
-						[BigNum]::new(2).CloneWithNewRes($res)).CloneWithNewRes($res)
+				return ([BigNum]::new(-1).CloneWithNewResolution($res) /
+						[BigNum]::new(2).CloneWithNewResolution($res)).CloneWithNewResolution($res)
 			}
 			default {
 				# B_{odd>1} = 0
 				if ( ($n % 2) -eq 1 ) {
-					return [BigNum]::new(0).CloneWithNewRes($res)
+					return [BigNum]::new(0).CloneWithNewResolution($res)
 				}
 				# even n >= 2: compute / fetch from cache
 				[BigNum]::EnsureBernoulliNumberBUpTo($n)
 				$entry = [BigNum]::cachedBernoulliNumberB[$n]
-				[BigNum] $result = ([BigNum]::new([System.Numerics.BigInteger]$entry.num).CloneWithNewRes($res) / [BigNum]::new([System.Numerics.BigInteger]$entry.den).CloneWithNewRes($res)).CloneWithNewRes($res)
+				[BigNum] $result = ([BigNum]::new([System.Numerics.BigInteger]$entry.num).CloneWithNewResolution($res) / [BigNum]::new([System.Numerics.BigInteger]$entry.den).CloneWithNewResolution($res)).CloneWithNewResolution($res)
 			}
 		}
 
@@ -1592,14 +1691,14 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		# H_0 = 0
 		if ($N -eq 0) {
-			return [BigNum]::new(0).CloneWithNewRes($res)
+			return [BigNum]::new(0).CloneWithNewResolution($res)
 		}
 
 		$resolution = $res +5
 
 		# Reusable Consts at target working precision
-		[BigNum]$constZero = [BigNum]::new(0).CloneWithNewRes($resolution)
-		[BigNum]$constOne = [BigNum]::new(1).CloneWithNewRes($resolution)
+		[BigNum]$constZero = [BigNum]::new(0).CloneWithNewResolution($resolution)
+		[BigNum]$constOne = [BigNum]::new(1).CloneWithNewResolution($resolution)
 
 		# Running sum
     	[BigNum]$sum = $constZero.Clone()
@@ -1625,7 +1724,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 			for([System.Numerics.BigInteger]$i=$k; $i -ge $blockStart; $i-=1){
 				# 1 / i
-				[BigNum]$term = $constOne / [BigNum]::new($i).CloneWithNewRes($resolution)
+				[BigNum]$term = $constOne / [BigNum]::new($i).CloneWithNewResolution($resolution)
 				# simple add; we *could* do compensated add but inside block cost dominates division anyway
 				$blk += $term
 			}
@@ -1641,15 +1740,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 			$sum = $t
 
 			# Periodic truncation to keep representation bounded
-			$sum  = $sum.Truncate($resolution).CloneWithNewRes($resolution)
-			$csum = $csum.Truncate($resolution).CloneWithNewRes($resolution)
+			$sum  = $sum.Truncate($resolution).CloneWithNewResolution($resolution)
+			$csum = $csum.Truncate($resolution).CloneWithNewResolution($resolution)
 
 			# next chunk
 			$k = $blockStart - 1
 		}
 		# Final compensated result
 		$sum += $csum
-		return $sum.Truncate($res).CloneWithNewRes($res)
+		return $sum.Truncate($res).CloneWithNewResolution($res)
 	}
 
 	# SpougeCoefficient: Spouge Coefficient generator
@@ -1672,37 +1771,29 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		if ($k -eq 0) {
 			return $ConstSqrt2Pi
-			# return (([BigNum]::new(1).CloneWithNewRes($resolution) / $ConstSqrt2Pi).Truncate($resolution))
-			# return (([BigNum]::new(1).CloneWithNewRes($resolution)).Truncate($resolution))
+			# return (([BigNum]::new(1).CloneWithNewResolution($resolution) / $ConstSqrt2Pi).Truncate($resolution))
+			# return (([BigNum]::new(1).CloneWithNewResolution($resolution)).Truncate($resolution))
 		}
 
-		$bnA     = ([BigNum]$a).CloneWithNewRes($wrkRes)
-        $bnK     = ([BigNum]$k).CloneWithNewRes($wrkRes)
+		$bnA     = ([BigNum]$a).CloneWithNewResolution($wrkRes)
+        $bnK     = ([BigNum]$k).CloneWithNewResolution($wrkRes)
 
 		$powPart = [BigNum]::Pow(($bnA - $bnK), ($bnK - 0.5))
         $expPart = [BigNum]::Exp(($bnA - $bnK))
-        $fact    = [BigNum]::Factorial(($k - 1)).CloneWithNewRes($wrkRes)
-        $sign    = ((($k % 2) -eq 1) ? (([BigNum]1).CloneWithNewRes($wrkRes)) : (([BigNum]-1).CloneWithNewRes($wrkRes)))
+        $fact    = [BigNum]::Factorial(($k - 1)).CloneWithNewResolution($wrkRes)
+        $sign    = ((($k % 2) -eq 1) ? (([BigNum]1).CloneWithNewResolution($wrkRes)) : (([BigNum]-1).CloneWithNewResolution($wrkRes)))
 
         $ck = ($sign * $powPart * $expPart) / $fact
 
 		return $ck.Truncate($resolution)
 	}
 
-    # SpouseChooseA: INTERNAL USE. Heuristic a depending on the number of digits requested
-    hidden static [System.Numerics.BigInteger] SpouseChooseA([System.Numerics.BigInteger] $resolutions) {
-        $ln2pi = [BigNum]::Ln(([BigNum]2).CloneWithNewRes($resolutions) * [BigNum]::Pi($resolutions))
-		$ln10  = [BigNum]::Ln(10)
-        $aEst  = (((([BigNum]$resolutions).CloneWithNewRes($resolutions) * $ln10) / $ln2pi).Ceiling(0) + ([BigNum]10)).Int()
-		return [BigNum]::Max($aEst, 10).Int()
-    }
-
 	# ReciprocalPow : INTERNAL USE. Returns the value of 1/N^p at $res resolution.
 	hidden static [BigNum] ReciprocalPow([System.Numerics.BigInteger] $N,[int] $p,[System.Numerics.BigInteger] $res){
 		# compute 1/N^p at working resolution
-		$tmp = [BigNum]::new([System.Numerics.BigInteger]$N).CloneWithNewRes($res)
+		$tmp = [BigNum]::new([System.Numerics.BigInteger]$N).CloneWithNewResolution($res)
 		$tmpPow = [BigNum]::PowInt($tmp,$p)
-		return ([BigNum]::new(1).CloneWithNewRes($res) / $tmpPow).CloneWithNewRes($res)
+		return ([BigNum]::new(1).CloneWithNewResolution($res) / $tmpPow).CloneWithNewResolution($res)
 	}
 
 	# EulerMascheroniGamma : Return the 1000 first digits of the Euler-Mascheroni Gamma constant.
@@ -1723,11 +1814,11 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		[bool]$testAlwaysCompute = $false   # set $true when you want to force algorithm test
 		if (-not $testAlwaysCompute) {
 			if ($resolution -le 1000) {
-				return [BigNum]::EulerMascheroniGamma().Truncate($resolution).CloneWithNewRes($resolution)
+				return [BigNum]::EulerMascheroniGamma().Truncate($resolution).CloneWithNewResolution($resolution)
 			}
 
 			if ($resolution -le [BigNum]::cachedEulerMascheroniGamma.getMaxDecimalResolution()) {
-				return [BigNum]::cachedEulerMascheroniGamma.Truncate($resolution).CloneWithNewRes($resolution)
+				return [BigNum]::cachedEulerMascheroniGamma.Truncate($resolution).CloneWithNewResolution($resolution)
 			}
 		}
 
@@ -1740,7 +1831,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		[System.Numerics.BigInteger]$tmpWrk = $resolution + $tmpGuard
 
 		# ------------- Coarse N heuristic -------------
-		$Napprox = (([BigNum]$tmpWrk) * [BigNum]::Ln(([BigNum]10).CloneWithNewRes($tmpWrk)) / ([BigNum]2).CloneWithNewRes($tmpWrk)).Ceiling(0)
+		$Napprox = (([BigNum]$tmpWrk) * [BigNum]::Ln(([BigNum]10).CloneWithNewResolution($tmpWrk)) / ([BigNum]2).CloneWithNewResolution($tmpWrk)).Ceiling(0)
 		if($Napprox -lt 10){ $Napprox = ([BigNum]10) }
 		[System.Numerics.BigInteger]$N = $Napprox.Int()
 
@@ -1751,8 +1842,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 		# ------------- Remainder coefficient (at provisional precision) -------------
 		$BnextProv   = [BigNum]::BernoulliNumberB($nextExponent,$tmpWrk)
-		$coefNextProv = $BnextProv / ([BigNum]::new($nextExponent).CloneWithNewRes($tmpWrk))
-		$targetProv   = [BigNum]::PowTen(-$tmpWrk).CloneWithNewRes($tmpWrk)
+		$coefNextProv = $BnextProv / ([BigNum]::new($nextExponent).CloneWithNewResolution($tmpWrk))
+		$targetProv   = [BigNum]::PowTen(-$tmpWrk).CloneWithNewResolution($tmpWrk)
 		
 		# ------------- Refine N upward (cheap, provisional precision) -------------
 		[System.Numerics.BigInteger]$Nmax = [System.Numerics.BigInteger]::Parse("10000000")  # tune
@@ -1769,22 +1860,22 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		$N = $N / 2
 
 		# ------------- compute Target -------------
-		[BigNum]$target = [BigNum]::PowTen(-$tmpWrk).CloneWithNewRes($tmpWrk)
+		[BigNum]$target = [BigNum]::PowTen(-$tmpWrk).CloneWithNewResolution($tmpWrk)
 
 		# ------------- compute H_N and ln N -------------
 		[BigNum]$HN  = [BigNum]::HarmonicSeriesHn($N,$tmpWrk)
-		[BigNum]$lnN = [BigNum]::Ln([BigNum]::new($N).CloneWithNewRes($tmpWrk))
+		[BigNum]$lnN = [BigNum]::Ln([BigNum]::new($N).CloneWithNewResolution($tmpWrk))
 
 		[BigNum]$gamma = $HN - $lnN
 		
 		# -1/(2N)
-		[BigNum]$Nbn = [BigNum]::new($N).CloneWithNewRes($tmpWrk)
-		$gamma -= ([BigNum]::new(1).CloneWithNewRes($tmpWrk) / (2 * $Nbn))
+		[BigNum]$Nbn = [BigNum]::new($N).CloneWithNewResolution($tmpWrk)
+		$gamma -= ([BigNum]::new(1).CloneWithNewResolution($tmpWrk) / (2 * $Nbn))
 
 		# + Sum_{k in emExponents} B_k/(k N^k)
 		foreach($k in $emExponents) {
 			$Bk = [BigNum]::BernoulliNumberB($k,$tmpWrk)
-			$coef = $Bk / ([BigNum]::new($k).CloneWithNewRes($tmpWrk))
+			$coef = $Bk / ([BigNum]::new($k).CloneWithNewResolution($tmpWrk))
 			$Nk = [BigNum]::ReciprocalPow($N,$k,$tmpWrk)
 			$term = $coef * $Nk
 			$gamma += $term
@@ -1793,7 +1884,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		}
 
 		# Store at the new resolution
-		[BigNum]::cachedEulerMascheroniGamma = $gamma.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedEulerMascheroniGamma = $gamma.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedEulerMascheroniGamma.Clone()
@@ -1820,21 +1911,21 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::AperyZeta3().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::AperyZeta3().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		[BigNum] $tmpAZ3 = 0
 		throw "AperyZeta3 does not support arbitrary lenght yet"
 
 		if ($resolution -le [BigNum]::cachedAperyZeta3.getMaxDecimalResolution()) {
-			return [BigNum]::cachedAperyZeta3.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedAperyZeta3.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpAZ3 = 0
 		
 		# Store at the new resolution
-		[BigNum]::cachedAperyZeta3 = $tmpAZ3.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedAperyZeta3 = $tmpAZ3.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedAperyZeta3.Clone()
@@ -1861,21 +1952,21 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::CatalanG().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::CatalanG().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		[BigNum] $tmpCatG = 0
 		throw "CatalanG does not support arbitrary lenght yet"
 
 		if ($resolution -le [BigNum]::cachedCatalanG.getMaxDecimalResolution()) {
-			return [BigNum]::cachedCatalanG.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedCatalanG.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpCatG = 0
 		
 		# Store at the new resolution
-		[BigNum]::cachedCatalanG = $tmpCatG.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedCatalanG = $tmpCatG.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedCatalanG.Clone()
@@ -1902,21 +1993,21 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::FeigenbaumA().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::FeigenbaumA().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		[BigNum] $tmpFA = 0
 		throw "FeigenbaumA does not support arbitrary lenght yet"
 
 		if ($resolution -le [BigNum]::cachedFeigenbaumA.getMaxDecimalResolution()) {
-			return [BigNum]::cachedFeigenbaumA.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedFeigenbaumA.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpFA = 0
 
 		# Store at the new resolution
-		[BigNum]::cachedFeigenbaumA = $tmpFA.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedFeigenbaumA = $tmpFA.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedFeigenbaumA.Clone()
@@ -1943,21 +2034,21 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::FeigenbaumDelta().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::FeigenbaumDelta().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		[BigNum] $tmpFD = 0
 		throw "FeigenbaumDelta does not support arbitrary lenght yet"
 
 		if ($resolution -le [BigNum]::cachedFeigenbaumDelta.getMaxDecimalResolution()) {
-			return [BigNum]::cachedFeigenbaumDelta.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedFeigenbaumDelta.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		# $tmpResolution = $resolution + 100
 		[BigNum] $tmpFD = 0
 
 		# Store at the new resolution
-		[BigNum]::cachedFeigenbaumDelta = $tmpFD.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedFeigenbaumDelta = $tmpFD.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedFeigenbaumDelta.Clone()
@@ -1984,18 +2075,18 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Sqrt2().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::Sqrt2().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedSqrt2.getMaxDecimalResolution()) {
-			return [BigNum]::cachedSqrt2.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedSqrt2.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
-		[BigNum] $tmpSqrt2 = [BigNum]::Sqrt(([BigNum]2).CloneWithNewRes($tmpResolution))
+		[BigNum] $tmpSqrt2 = [BigNum]::Sqrt(([BigNum]2).CloneWithNewResolution($tmpResolution))
 		
 		# Store at the new resolution
-		[BigNum]::cachedSqrt2 = $tmpSqrt2.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedSqrt2 = $tmpSqrt2.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedSqrt2.Clone()
@@ -2022,18 +2113,18 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Sqrt3().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::Sqrt3().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedSqrt3.getMaxDecimalResolution()) {
-			return [BigNum]::cachedSqrt3.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedSqrt3.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
-		[BigNum] $tmpSqrt3 = [BigNum]::Sqrt(([BigNum]3).CloneWithNewRes($tmpResolution))
+		[BigNum] $tmpSqrt3 = [BigNum]::Sqrt(([BigNum]3).CloneWithNewResolution($tmpResolution))
 
 		# Store at the new resolution
-		[BigNum]::cachedSqrt3 = $tmpSqrt3.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedSqrt3 = $tmpSqrt3.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedSqrt3.Clone()
@@ -2060,18 +2151,18 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Cbrt2().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::Cbrt2().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedCbrt2.getMaxDecimalResolution()) {
-			return [BigNum]::cachedCbrt2.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedCbrt2.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
-		[BigNum] $tmpCbrt2 = [BigNum]::Cbrt(([BigNum]2).CloneWithNewRes($tmpResolution))
+		[BigNum] $tmpCbrt2 = [BigNum]::Cbrt(([BigNum]2).CloneWithNewResolution($tmpResolution))
 		
 		# Store at the new resolution
-		[BigNum]::cachedCbrt2 = $tmpCbrt2.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedCbrt2 = $tmpCbrt2.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedCbrt2.Clone()
@@ -2098,18 +2189,18 @@ class BigNum : System.IComparable, System.IEquatable[object] {
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Cbrt3().Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::Cbrt3().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedCbrt3.getMaxDecimalResolution()) {
-			return [BigNum]::cachedCbrt3.Truncate($resolution).CloneWithNewRes($resolution)
+			return [BigNum]::cachedCbrt3.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
-		[BigNum] $tmpCbrt3 = [BigNum]::Cbrt(([BigNum]3).CloneWithNewRes($tmpResolution))
+		[BigNum] $tmpCbrt3 = [BigNum]::Cbrt(([BigNum]3).CloneWithNewResolution($tmpResolution))
 		
 		# Store at the new resolution
-		[BigNum]::cachedCbrt3 = $tmpCbrt3.Clone().Truncate($resolution).CloneWithNewRes($resolution)
+		[BigNum]::cachedCbrt3 = $tmpCbrt3.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedCbrt3.Clone()
