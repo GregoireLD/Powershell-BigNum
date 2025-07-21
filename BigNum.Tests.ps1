@@ -147,8 +147,8 @@ Describe "BigNum class unit tests" {
         It "Computes Arctan(-5.23) correctly" {
             [BigNum]::Arctan("5.23").Truncate(10).ToString() | Should -Match "^1[,.]3818720191"
         }
-        It "Computes Arctan2(0.001,-1.001) correctly" {
-            ([BigNum]::Arctan2([BigNum]"0.001",[BigNum]"-1.001")).Truncate(10).ToString() | Should -Match "^3[,.]1405936529"
+        It "Computes Atan2(0.001,-1.001) correctly" {
+            ([BigNum]::Atan2([BigNum]"0.001",[BigNum]"-1.001")).Truncate(10).ToString() | Should -Match "^3[,.]1405936529"
         }
     }
 
