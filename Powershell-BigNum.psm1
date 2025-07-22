@@ -1104,6 +1104,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# Sin: Sine Function.
 	static [BigNum] Sin([BigNum] $val) {
 		
+		# Sin is defined on R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1138,6 +1140,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# Cos: Cosine Function.
 	static [BigNum] Cos([BigNum] $val) {
 		
+		# Cos is defined on R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1173,6 +1177,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# Tan: Tangent Function.
 	static [BigNum] Tan([BigNum] $val) {
 
+		# Tan is defined on R \ {Pi/2 + kPi, k in Z} (Cos != 0)
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1194,6 +1200,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# Csc: Cosecant Function.
 	static [BigNum] Csc([BigNum] $val) {
 
+		# Csc is defined on R \ {kPi, k in Z} (Sin != 0)
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1209,6 +1217,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Sec: Secant Function.
 	static [BigNum] Sec([BigNum] $val) {
+
+		# Sec is defined on R \ {Pi/2 + kPi, k in Z} (Cos != 0)
 
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
@@ -1226,14 +1236,22 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# Cot: Cotangent Function.
 	static [BigNum] Cot([BigNum] $val) {
 
+		# Cot is defined on R \ {kPi, k in Z} (Sin != 0)
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
+		[BigNum] $sinVal = [BigNum]::Cos($val.CloneWithNewResolution($wrkRes))
+
+		if($sinVal.IsNull()) {
+			throw "Cot(x) undefined: Sin(x) is null."
+		}
+
 		[BigNum] $tanVal = [BigNum]::Tan($val.CloneWithNewResolution($wrkRes))
 
 		if($tanVal.IsNull()) {
-			throw "Sec(x) undefined: Tan(x) is null."
+			throw "Cot(x) undefined: Tan(x) is null."
 		}
 
 		return ($constOne / $tanVal).CloneWithNewResolution($targetRes)
@@ -1241,6 +1259,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Arcsin: Inverse Sine Function.
 	static [BigNum] Arcsin([BigNum] $val) {
+
+		# Arcsin is defined on [−1, 1]
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
 
@@ -1268,11 +1289,22 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Arccos: Inverse Cosine Function.
 	static [BigNum] Arccos([BigNum] $val) {
+
+		# Arccos is defined on [−1, 1]
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
 
+		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+		[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
+		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
+
+		if ($absVal -gt $constOne) {
+			throw "Arccos undefined for |x| > 1"
+		}
+
 		[BigNum] $piOver2 = [BigNum]::Pi($wrkRes) / ([BigNum]"2").CloneWithNewResolution($wrkRes)
-		[BigNum] $arcsin = [BigNum]::Arcsin($val.CloneWithNewResolution($wrkRes))
+		[BigNum] $arcsin = [BigNum]::Arcsin($tmpVal.CloneWithNewResolution($wrkRes))
 		[BigNum] $result = $piOver2 - $arcsin
 
 		return $result.Truncate($targetRes)
@@ -1280,6 +1312,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Arctan: Inverse Tangent Function.
 	static [BigNum] Arctan([BigNum] $val) {
+
+		# Arctan is defined on R
 
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
@@ -1330,6 +1364,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# Atan2: Two-Argument Inverse Tangent Function. Returns a quadrant-aware signed angle.
 	static [BigNum] Atan2([BigNum] $y, [BigNum] $x) {
 
+		# Atan2 is defined on R x R
+
 		[System.Numerics.BigInteger] $targetRes = ([BigNum]::Max($y.maxDecimalResolution, $x.maxDecimalResolution)).Int()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
 
@@ -1357,36 +1393,51 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Arccsc: Inverse Cosecant Function.
 	static [BigNum] Arccsc([BigNum] $val) {
-		if ($val.IsNull()) {
-			throw "Error in [BigNum]::Arccsc : val must not be null"
-		}
+
+		# Arccsc is defined on ]-Inf, −1] U [1, +Inf[
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
+		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+		[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
+
+		if ($absVal -lt 1) {
+			throw "Error in [BigNum]::Arccsc : magnitude of val must be strictly greater than 1"
+		}
+
 		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-		[BigNum] $newVal = $val.CloneWithNewResolution($wrkRes)
-		[BigNum] $arccscVal = [BigNum]::Arcsin($constOne / $newVal)
+		[BigNum] $arccscVal = [BigNum]::Arcsin($constOne / $tmpVal)
 
 		return $arccscVal.CloneWithNewResolution($targetRes)
 	}
 
 	# Arcsec: Inverse Secant Function.
 	static [BigNum] Arcsec([BigNum] $val) {
-		if ($val.IsNull()) {
-			throw "Error in [BigNum]::Arcsec : val must not be null"
-		}
+
+		# Arcsec is defined on ]-Inf, −1] U [1, +Inf[
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
+		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+		[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
+
+		if ($absVal -lt 1) {
+			throw "Error in [BigNum]::Arcsec : magnitude of val must be strictly greater than 1"
+		}
+
 		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-		[BigNum] $newVal = $val.CloneWithNewResolution($wrkRes)
-		[BigNum] $arcsecVal = [BigNum]::Arccos($constOne / $newVal)
+		[BigNum] $arcsecVal = [BigNum]::Arccos($constOne / $tmpVal)
 
 		return $arcsecVal.CloneWithNewResolution($targetRes)
 	}
 
 	# Arccot: Inverse Cotangent Function.
 	static [BigNum] Arccot([BigNum] $val) {
+
+		# Arccot is defined on R x R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1407,6 +1458,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Sinh: Hyperbolic Sine Function.
 	static [BigNum] Sinh([BigNum] $val) {
+
+		# Sinh is defined on R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1422,6 +1476,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Cosh: Hyperbolic Cosine Function.
 	static [BigNum] Cosh([BigNum] $val) {
+
+		# Cosh is defined on R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1437,16 +1494,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Tanh: Hyperbolic Tangent Function.
 	static [BigNum] Tanh([BigNum] $val) {
+
+		# Tanh is defined on R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 		[BigNum] $num  = [BigNum]::Sinh($tmpVal)
 		[BigNum] $den = [BigNum]::Cosh($tmpVal)
-		# Protect against x ≈ 0
-		if ($den.IsNull()) {
-			throw "Error in [BigNum]::Tanh : Cosh(x) caused a Division by zero"
-		}
 		[BigNum] $tanhVal = ($num / $den)
 
 		return $tanhVal.Truncate($targetRes)
@@ -1454,16 +1510,19 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Csch: Hyperbolic Cosecant Function.
 	static [BigNum] Csch([BigNum] $val) {
+
+		# Csch is defined on R*
+
+		if ($val.IsNull()) {
+			throw "Error in [BigNum]::Csch : val must not be null"
+		}
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 		[BigNum] $num  = ([BigNum]1).CloneWithNewResolution($wrkRes)
 		[BigNum] $den = [BigNum]::Sinh($tmpVal)
-		# Protect against x ≈ 0
-		if ($den.IsNull()) {
-			throw "Error in [BigNum]::Csch : Sinh(x) caused a Division by zero"
-		}
 		[BigNum] $cschVal = ($num / $den)
 
 		return $cschVal.Truncate($targetRes)
@@ -1471,16 +1530,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Sech: Hyperbolic Secant Function.
 	static [BigNum] Sech([BigNum] $val) {
+
+		# Sech is defined on R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 		[BigNum] $num  = ([BigNum]1).CloneWithNewResolution($wrkRes)
 		[BigNum] $den = [BigNum]::Cosh($tmpVal)
-		# Protect against x ≈ 0
-		if ($den.IsNull()) {
-			throw "Error in [BigNum]::Sech : Cosh(x) caused a Division by zero"
-		}
 		[BigNum] $sechVal = ($num / $den)
 
 		return $sechVal.Truncate($targetRes)
@@ -1488,23 +1546,29 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Coth: Hyperbolic Cotangent Function.
 	static [BigNum] Coth([BigNum] $val) {
+
+		# Coth is defined on R*
+
+		if ($val.IsNull()) {
+			throw "Error in [BigNum]::Coth : val must not be null"
+		}
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 		[BigNum] $num  = [BigNum]::Cosh($tmpVal)
 		[BigNum] $den = [BigNum]::Sinh($tmpVal)
-		# Protect against x ≈ 0
-		if ($den.IsNull()) {
-			throw "Error in [BigNum]::Coth : Sinh(x) caused a Division by zero"
-		}
 		[BigNum] $cothVal = ($num / $den)
 
 		return $cothVal.Truncate($targetRes)
 	}
 
-	# Arcsinh: Inverse Hyperbolic Arcsine Function.
+	# Arcsinh: Inverse Hyperbolic Sine Function.
 	static [BigNum] Arcsinh([BigNum] $val) {
+
+		# Arcsinh is defined on R
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1517,11 +1581,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return $arcsinhVal.Truncate($targetRes)
 	}
 
-	# Arccosh: Inverse Hyperbolic Arccosine Function.
+	# Arccosh: Inverse Hyperbolic Cosine Function.
 	static [BigNum] Arccosh([BigNum] $val) {
+
+		# Arccosh is defined on [1, +Inf[
+
 		if ($val -lt 1) {
 			throw "Error in [BigNum]::Arccosh : val must be equal or greater than 1"
 		}
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1534,13 +1602,19 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return $arccoshVal.Truncate($targetRes)
 	}
 
-	# Arctanh: Inverse Hyperbolic Arctangent Function.
+	# Arctanh: Inverse Hyperbolic Tangent Function.
 	static [BigNum] Arctanh([BigNum] $val) {
-		if ($val.Abs() -ge 1) {
-			throw "Error in [BigNum]::Arctanh : magnitude of val must be smaller than 1"
-		}
+
+		# Arctanh is defined on ]−1, 1[
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+		[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
+
+		if ($absVal -ge 1) {
+			throw "Error in [BigNum]::Arctanh : magnitude of val must be strictly smaller than 1"
+		}
 
 		[BigNum] $constOne = ([BigNum]1).CloneWithNewResolution($wrkRes)
 		[BigNum] $constHalf = ([BigNum]"0.5").CloneWithNewResolution($wrkRes)
@@ -1551,11 +1625,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return $arctanhVal.Truncate($targetRes)
 	}
 
-	# Arccsch: Inverse Hyperbolic Arccosecant Function.
+	# Arccsch: Inverse Hyperbolic Cosecant Function.
 	static [BigNum] Arccsch([BigNum] $val) {
+
+		# Arccsch is defined on R*
+
 		if ($val.IsNull()) {
-			throw "Error in [BigNum]::Arccsch : val must be non-zero"
+			throw "Error in [BigNum]::Arccsch : val must not be null"
 		}
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1569,11 +1647,15 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return $arccschVal.Truncate($targetRes)
 	}
 
-	# Arcsech: Inverse Hyperbolic Arcsecant Function.
+	# Arcsech: Inverse Hyperbolic Secant Function.
 	static [BigNum] Arcsech([BigNum] $val) {
+
+		# Arcsech is defined on ]0, 1]
+
 		if (($val -le 0) -or ($val -gt 1)) {
 			throw "Error in [BigNum]::Arcsech : val must be greater than 0 and smaller or equal to 1"
 		}
+
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
@@ -1589,9 +1671,13 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Arccoth: Inverse Hyperbolic Cotangent Function.
 	static [BigNum] Arccoth([BigNum] $val) {
+
+		# Arccoth is defined on ]-Inf, −1] U [1, +Inf[
+
 		if ($val.Abs() -le 1) {
 			throw "Error in [BigNum]::Arccoth : magnitude of val must be greater than 1"
 		}
+		
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
