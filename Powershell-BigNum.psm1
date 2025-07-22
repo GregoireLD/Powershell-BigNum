@@ -818,8 +818,8 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# Sqrt : Returns the value of the Square Root of $value using the Newton-Raphson algorithm.
 	static [BigNum] Sqrt([BigNum] $value) {
-		if ($value.IsNegative()) {
-        	throw "[BigNum]::Sqrt() is not defined for negative numbers"
+		if ($value.IsStrictlyNegative()) {
+        	throw "[BigNum]::Sqrt() is not defined for null or negative numbers"
 		}
 
 		$tmpResolution = $value.maxDecimalResolution + 10

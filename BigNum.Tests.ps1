@@ -13,10 +13,16 @@ Describe "BigNum class unit tests" {
             ([BigNum]([int]5)).ToString() | Should -Be "5"
         }
         It "Constructs from float" {
-            ([BigNum]3.14).ToString() | Should -Match "^3[,.]14"
+            ([BigNum]([float]3.14)).ToString() | Should -Match "^3[,.]14"
         }
-        It "Constructs from negative int" {
-            ([BigNum]-7).ToString() | Should -Match "^-7"
+        It "Constructs from negative double" {
+            ([BigNum]([float]-7.0)).ToString() | Should -Be "-7"
+        }
+        It "Constructs from negative decimal" {
+            ([BigNum]([decimal]159.42)).ToString() | Should -Match "^159[,.]42"
+        }
+        It "Constructs from BigInt" {
+            ([BigNum]([System.Numerics.BigInteger]"123456789")).ToString() | Should -Be "123456789"
         }
         It "Constructs from string" {
             ([BigNum]"-123ver45.6789cwe01").ToString() | Should -Match "^-12345[,.]678901"
@@ -25,29 +31,62 @@ Describe "BigNum class unit tests" {
 
     Context "Basic arithmetic" {
         It "Addition works" {
-            ([BigNum]5 + [BigNum]2).ToString() | Should -Be "7"
+            (([BigNum]5) + ([BigNum]2)).ToString() | Should -Be "7"
         }
         It "Subtraction works" {
-            ([BigNum]5 - [BigNum]2).ToString() | Should -Be "3"
+            (([BigNum]5) - ([BigNum]2)).ToString() | Should -Be "3"
         }
         It "Multiplication works" {
-            ([BigNum]5 * [BigNum]2).ToString() | Should -Be "10"
+            (([BigNum]5) * ([BigNum]2)).ToString() | Should -Be "10"
         }
         It "Division works" {
-            ([BigNum]10 / [BigNum]2).ToString() | Should -Be "5"
+            (([BigNum]10) / ([BigNum]3)).CloneWithNewResolution(5).ToString() | Should -Match "3[,.]33333"
         }
     }
 
     Context "Modulus" {
         It "Modulo works with positive ints" {
-            ([BigNum]5 % [BigNum]2).ToString() | Should -Be "1"
+            (([BigNum]5) % ([BigNum]2)).ToString() | Should -Be "1"
         }
         It "Modulo works with non-ints" {
-            ([BigNum]"8765.868" % [BigNum]"2.6").ToString() | Should -Match "^1[,.]268"
+            (([BigNum]"8765.868") % ([BigNum]"2.6")).ToString() | Should -Match "^1[,.]268"
         }
     }
 
-    Context "Exp Tests" {
+    Context "IComparable and IEquatable" {
+        It "CompareTo works with auto-casting" {
+            (([BigNum]"18024756") -gt 42) | Should -Be $true
+        }
+        It "Modulo works with non-ints" {
+            (([BigNum]"8765.868000") -eq ([BigNum]"008765.86800")) | Should -Be $true
+        }
+    }
+
+    Context "Simple Methods" {
+        It "Min between two numbers" {
+            [BigNum]::Min(5,15).ToString() | Should -Be "5"
+        }
+        It "Max between two numbers" {
+            [BigNum]::Max(5,15).ToString() | Should -Be "15"
+        }
+        It "Euclidean Division between two numbers" {
+            [BigNum]::EuclideanDiv(17,5).ToString() | Should -Be "3"
+        }
+    }
+
+    Context "Roots" {
+        It "Sqrt" {
+            [BigNum]::Sqrt(15).CloneWithNewResolution(5).ToString() | Should -Match "^3[,.]87298"
+        }
+        It "Cbrt" {
+            [BigNum]::Cbrt(15).CloneWithNewResolution(5).ToString() | Should -Match "^2[,.]46621"
+        }
+        It "4.6th Root" {
+            [BigNum]::NthRoot(([BigNum]15).CloneWithNewResolution(5),4.6).ToString() | Should -Match "^1[,.]80165"
+        }
+    }
+
+    Context "Exp, Pow, Ln, and Log" {
         It "Exp works with a positive integer" {
             [BigNum]::Exp(5).ToString() | Should -Match "^148[,.]4131591025"
         }
@@ -57,30 +96,6 @@ Describe "BigNum class unit tests" {
         It "Exp works with a negative non-integer" {
             [BigNum]::Exp("-42.42").ToString() | Should -Match "^0[,.]0000000000000000003777705319"
         }
-    }
-
-    Context "Ln and Log Tests" {
-        It "Ln works with a positive integer" {
-            [BigNum]::Ln(5).ToString() | Should -Match "^1[,.]609437912434"
-        }
-        It "Ln works with a positive non-integer" {
-            [BigNum]::Ln("0.42").ToString() | Should -Match "^-0[,.]8675005677047230"
-        }
-        It "Ln throws with a negative number" {
-            { [BigNum]::Ln("-42.42").ToString() } | Should -Throw
-        }
-        It "Log works with positive integers" {
-            [BigNum]::Log(3,43).ToString() | Should -Match "^3[,.]42359188449767959"
-        }
-        It "Log works with positive non-integer" {
-            [BigNum]::Log("75","0.42").ToString() | Should -Match "^-0[,.]2009271467325899121"
-        }
-        It "Log throws with a negative base" {
-            { [BigNum]::Log("-42.42","412").ToString() } | Should -Throw
-        }
-    }
-
-    Context "Pow Tests" {
         It "Pow works with positive integers" {
             [BigNum]::Pow(24,3).ToString() | Should -Be "13824"
         }
@@ -98,6 +113,24 @@ Describe "BigNum class unit tests" {
         }
         It "Pow throws for complex output" {
             { [BigNum]::Pow(-3.3,-5.1).ToString() } | Should -Throw
+        }
+        It "Ln works with a positive integer" {
+            [BigNum]::Ln(5).ToString() | Should -Match "^1[,.]609437912434"
+        }
+        It "Ln works with a positive non-integer" {
+            [BigNum]::Ln("0.42").ToString() | Should -Match "^-0[,.]8675005677047230"
+        }
+        It "Ln throws with a negative number" {
+            { [BigNum]::Ln("-42.42").ToString() } | Should -Throw
+        }
+        It "Log works with positive integers" {
+            [BigNum]::Log(3,43).ToString() | Should -Match "^3[,.]42359188449767959"
+        }
+        It "Log works with positive non-integer" {
+            [BigNum]::Log("75","0.42").ToString() | Should -Match "^-0[,.]2009271467325899121"
+        }
+        It "Log throws with a negative base" {
+            { [BigNum]::Log("-42.42","412").ToString() } | Should -Throw
         }
     }
 
@@ -119,36 +152,96 @@ Describe "BigNum class unit tests" {
         }
     }
 
-    Context "Factorial Tests" {
+    Context "Factorial and Gamma" {
         It "Computes 10! correctly" {
             ([BigNum]::Factorial(10)).ToString() | Should -Be 3628800
         }
         It "Computes (5.5)! with 10 digits correctly" {
             ([BigNum]::Factorial(([BigNum]5.5).CloneWithNewResolution(10))).ToString() | Should -Match "^287[,.]885277815"
         }
+        It "Computes Gamma(-4.5) with 10 digits correctly" {
+            ([BigNum]::Gamma(([BigNum]"-4.5").CloneWithNewResolution(10))).CloneWithNewResolution(10).ToString() | Should -Match "^-0[,.]0600196013"
+        }
     }
 
     Context "Trigonometry Tests" {
-        It "Computes Sin(-5.23) correctly" {
+        It "Computes Sin(-5.23) (Sine) correctly" {
             [BigNum]::Sin("-5.23").Truncate(10).ToString() | Should -Match "^0[,.]869003739"
         }
-        It "Computes Cos(-5.23) correctly" {
+        It "Computes Cos(-5.23) (Cosine) correctly" {
             [BigNum]::Cos("-5.23").Truncate(10).ToString() | Should -Match "^0[,.]4948055189"
         }
-        It "Computes Tan(-5.23) correctly" {
+        It "Computes Tan(-5.23) (Tangent) correctly" {
             [BigNum]::Tan("-5.23").Truncate(10).ToString() | Should -Match "^1[,.]7562531253"
         }
-        It "Computes Arcsin(0.84) correctly" {
+        It "Computes Csc(-5.23) (Cosecant) correctly" {
+            [BigNum]::Csc("-5.23").Truncate(10).ToString() | Should -Match "^1[,.]1507430349"
+        }
+        It "Computes Sec(-5.23) (Secant) correctly" {
+            [BigNum]::Sec("-5.23").Truncate(10).ToString() | Should -Match "^2[,.]0209960515"
+        }
+        It "Computes Cot(-5.23) (Cotangent) correctly" {
+            [BigNum]::Cot("-5.23").Truncate(10).ToString() | Should -Match "^0[,.]5693940045"
+        }
+        It "Computes Arcsin(0.84) (Inverse Sine) correctly" {
             [BigNum]::Arcsin("0.84").Truncate(10).ToString() | Should -Match "^0[,.]9972832223"
         }
-        It "Computes Arccos(-0.42) correctly" {
+        It "Computes Arccos(-0.42) (Inverse Cosine) correctly" {
             [BigNum]::Arccos("-0.42").Truncate(10).ToString() | Should -Match "^2[,.]0042416468"
         }
-        It "Computes Arctan(-5.23) correctly" {
+        It "Computes Arctan(-5.23) (Inverse Tangent) correctly" {
             [BigNum]::Arctan("5.23").Truncate(10).ToString() | Should -Match "^1[,.]3818720191"
         }
-        It "Computes Atan2(0.001,-1.001) correctly" {
+        It "Computes Atan2(0.001,-1.001) (Two-Argument Inverse Tangent) correctly" {
             ([BigNum]::Atan2([BigNum]"0.001",[BigNum]"-1.001")).Truncate(10).ToString() | Should -Match "^3[,.]1405936529"
+        }
+        It "Computes Arccsc(1.84) (Inverse Cosecant) correctly" {
+            [BigNum]::Arccsc("1.84").Truncate(10).ToString() | Should -Match "^0[,.]5745752096"
+        }
+        It "Computes Arcsec(-1.42) (Inverse Secant) correctly" {
+            [BigNum]::Arcsec("-1.42").Truncate(10).ToString() | Should -Match "^2[,.]3521277919"
+        }
+        It "Computes Arccot(-5.23) (Inverse Cotangent) correctly" {
+            [BigNum]::Arccot("5.23").Truncate(10).ToString() | Should -Match "^0[,.]1889243076"
+        }
+    }
+
+    Context "Trigonometry Tests" {
+        It "Computes Sinh(-5.23) (Hyperbolic Sine) correctly" {
+            [BigNum]::Sinh("-5.23").Truncate(10).ToString() | Should -Match "^-93[,.]3937249974"
+        }
+        It "Computes Cosh(-5.13) (Hyperbolic Cosine) correctly" {
+            [BigNum]::Cosh("-5.13").Truncate(10).ToString() | Should -Match "^84[,.]5115173026"
+        }
+        It "Computes Tanh(0.42) (Hyperbolic Tangent) correctly" {
+            [BigNum]::Tanh("0.42").Truncate(10).ToString() | Should -Match "^0[,.]396930432"
+        }
+        It "Computes Csch(-5.23) (Hyperbolic Cosecant) correctly" {
+            [BigNum]::Csch("-5.23").Truncate(10).ToString() | Should -Match "^-0[,.]0107073574"
+        }
+        It "Computes Sech(-0.23) (Hyperbolic Secant) correctly" {
+            [BigNum]::Sech("-0.23").Truncate(10).ToString() | Should -Match "^0[,.]9741207235"
+        }
+        It "Computes Coth(-5.23) (Hyperbolic Cotangent) correctly" {
+            [BigNum]::Coth("-5.23").Truncate(10).ToString() | Should -Match "^-1[,.]0000573221"
+        }
+        It "Computes Arcsinh(0.84) (Hyperbolic Inverse Sine) correctly" {
+            [BigNum]::Arcsinh("0.84").Truncate(10).ToString() | Should -Match "^0[,.]7635992217"
+        }
+        It "Computes Arccosh(3.14) (Hyperbolic Inverse Cosine) correctly" {
+            [BigNum]::Arccosh("3.14").Truncate(10).ToString() | Should -Match "^1[,.]8109913489"
+        }
+        It "Computes Arctanh(-0.42) (Hyperbolic Inverse Tangent) correctly" {
+            [BigNum]::Arctanh("-0.42").Truncate(10).ToString() | Should -Match "^-0[,.]4476920235"
+        }
+        It "Computes Arccsch(0.84) (Hyperbolic Inverse Cosecant) correctly" {
+            [BigNum]::Arccsch("0.84").Truncate(10).ToString() | Should -Match "^1[,.]0098618321"
+        }
+        It "Computes Arcsech(0.42) (Hyperbolic Inverse Secant) correctly" {
+            [BigNum]::Arcsech("0.42").Truncate(10).ToString() | Should -Match "^1[,.]5133066884"
+        }
+        It "Computes Arccoth(-5.23) (Hyperbolic Inverse Cotangent) correctly" {
+            [BigNum]::Arccoth("5.23").Truncate(10).ToString() | Should -Match "^0[,.]1935871698"
         }
     }
 

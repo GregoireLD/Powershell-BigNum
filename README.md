@@ -14,11 +14,21 @@ It includes a wide set of features: from basic arithmetic to transcendental func
 
 ✅ Arbitrary-precision arithmetic (`+`, `-`, `*`, `/`, `%`)
 
-✅ Power functions (`Pow`, handles integer & non-integer exponents)
+✅ Power functions (`Pow` and `ModPow` handles integer & non-integer exponents)
 
 ✅ Roots: square root, cube root, **nth root (integer and non-integer)**
 
 ✅ Exponential and logarithm (`Exp`, `Ln`, `Log`)
+
+✅ Trigonometric functions (`Sin`, `Cos`, `Tan`, `Csc`, `Sec`, `Cot`)
+
+✅ Inverse Trigonometric functions (`Arcsin`, `Arccos`, `Arctan`, `Atan2`, `Arccsc`, `Arcsec`, `Arccot`)
+
+✅ Hyperbolic Trigonometric functions (`Sinh`, `Cosh`, `Tanh`, `Csch`, `Sech`, `Coth`)
+
+✅ Inverse Hyperbolic Trigonometric functions (`Arcsinh`, `Arccosh`, `Arctanh`, `Arccsch`, `Arcsech`, `Arccoth`)
+
+✅ Other functions functions (`Factorial`, `Gamma`, `EuclideanDiv`, `Min`, `Max`)
 
 ✅ Famous mathematical constants with arbitrary precision (`Pi`, `e`, `Tau`, `phi`)
 
