@@ -349,9 +349,12 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	[BigNum] CloneAndReducePrecisionBy([System.Numerics.BigInteger]$length){
 		#this shorten the resolution by $val amount, and rounds if necessary
 		if($length -lt 0) {
-			throw "Error in [BigNum]::CloneAndReducePrecisionBy : ${length} must be positive"
+			throw "Error in [BigNum]::CloneAndReducePrecisionBy : length must be positive or null"
 		}
-		return $this.Round($this.maxDecimalResolution - $length)
+		$newLength = $this.maxDecimalResolution - $length
+		$tmpVal = $this.Round($newLength)
+
+		return $tmpVal.CloneWithNewResolution([System.Numerics.BigInteger]::Max(0,$newLength))
 	}
 
 	#endregion Cloning and Resolution Tools
