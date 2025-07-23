@@ -178,7 +178,7 @@ To clear them:
 
 ## 🧪 Planned Improvements
 
-* Complex number support
+* Complex number support (Preliminary works started one the BigComplex class)
 * Performance optimizations
 
 ---
