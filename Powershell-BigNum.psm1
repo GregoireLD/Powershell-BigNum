@@ -14,10 +14,6 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	hidden static [BigNum] $cachedPhi
 	hidden static [hashtable] $cachedBernoulliNumberB = @{}  # n -> @{num=BigInteger; den=BigInteger}
 	hidden static [BigNum] $cachedEulerMascheroniGamma
-	hidden static [BigNum] $cachedAperyZeta3
-	hidden static [BigNum] $cachedCatalanG
-	hidden static [BigNum] $cachedFeigenbaumA
-	hidden static [BigNum] $cachedFeigenbaumDelta
 	hidden static [BigNum] $cachedSqrt2
 	hidden static [BigNum] $cachedSqrt3
 	hidden static [BigNum] $cachedCbrt2
@@ -2438,81 +2434,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return [BigNum]::new("1.2020569031595942853997381615114499907649862923404988817922715553418382057863130901864558736093352581461991577952607194184919959986732832137763968372079001614539417829493600667191915755222424942439615639096641032911590957809655146512799184051057152559880154371097811020398275325667876035223369849416618110570147157786394997375237852779370309560257018531827900030765471075630488433208697115737423807934450316076253177145354444118311781822497185263570918244899879620350833575617202260339378587032813126780799005417734869115253706562370574409662217129026273207323614922429130405285553723410330775777980642420243048828152100091460265382206962715520208227433500101529480119869011762595167636699817183557523488070371955574234729408359520886166620257285375581307928258648728217370556619689895266201877681062920081779233813587682842641243243148028217367450672069350762689530434593937503296636377575062473323992348288310773390527680200757984356793711505090050273660471140085335034364672248565315181177661810922").CloneWithAdjustedResolution()
 	}
 
-	# AperyZeta3 : (BigInteger) Return the $resolution first digits of the Apery Zeta(3) constant.
-	static [BigNum] AperyZeta3([System.Numerics.BigInteger] $resolution) {
-		if($resolution -lt 0){
-			throw "Resolution for AperyZeta3 must be a null or positive integer"
-		}
-
-		if (-not [BigNum]::cachedAperyZeta3) {
-        	[BigNum]::cachedAperyZeta3 = [BigNum]::AperyZeta3()
-    	}
-
-		if ($resolution -le 1000) {
-			return [BigNum]::AperyZeta3().Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		[BigNum] $tmpAZ3 = 0
-		throw "AperyZeta3 does not support arbitrary lenght yet"
-
-		if ($resolution -le [BigNum]::cachedAperyZeta3.getMaxDecimalResolution()) {
-			return [BigNum]::cachedAperyZeta3.Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		# $tmpResolution = $resolution + 100
-		[BigNum] $tmpAZ3 = 0
-		
-		# Store at the new resolution
-		[BigNum]::cachedAperyZeta3 = $tmpAZ3.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
-
-		# Return the new value
-		return [BigNum]::cachedAperyZeta3.Clone()
-	}
-
-	# ClearCachedAperyZeta3 : Clear the cached digits of the Apery Zeta(3) constant.
-	static [void] ClearCachedAperyZeta3() {
-    	[BigNum]::cachedAperyZeta3 = $null
-	}
-
 	# CatalanG : Return the 1000 first digits of Catalan G constant.
 	static [BigNum] CatalanG() {
 		return [BigNum]::new("0.9159655941772190150546035149323841107741493742816721342664981196217630197762547694793565129261151062485744226191961995790358988033258590594315947374811584069953320287733194605190387274781640878659090247064841521630002287276409423882599577415088163974702524820115607076448838078733704899008647751132259971343407485407553230768565335768095835260219382323950800720680355761048235733942319149829836189977069036404180862179411019175327431499782339761055122477953032487537187866582808236057022559419481809753509711315712615804242723636439850017382875977976530683700929808738874956108936597719409687268444416680462162433986483891628044828150627302274207388431172218272190472255870531908685735423498539498309919115967388464508615152499624237043745177737235177544070853846440132174839299994757244619975496197587064007474870701490937678873045869979860644874974643872062385137123927363049985035392239287879790633644032354784535851927777787270906083031994301332316712476158709792455479119092126201854803963934243").CloneWithAdjustedResolution()
-	}
-
-	# CatalanG : (BigInteger) Return the $resolution first digits of Catalan G constant.
-	static [BigNum] CatalanG([System.Numerics.BigInteger] $resolution) {
-		if($resolution -lt 0){
-			throw "Resolution for CatalanG must be a null or positive integer"
-		}
-
-		if (-not [BigNum]::cachedCatalanG) {
-        	[BigNum]::cachedCatalanG = [BigNum]::CatalanG()
-    	}
-
-		if ($resolution -le 1000) {
-			return [BigNum]::CatalanG().Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		[BigNum] $tmpCatG = 0
-		throw "CatalanG does not support arbitrary lenght yet"
-
-		if ($resolution -le [BigNum]::cachedCatalanG.getMaxDecimalResolution()) {
-			return [BigNum]::cachedCatalanG.Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		# $tmpResolution = $resolution + 100
-		[BigNum] $tmpCatG = 0
-		
-		# Store at the new resolution
-		[BigNum]::cachedCatalanG = $tmpCatG.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
-
-		# Return the new value
-		return [BigNum]::cachedCatalanG.Clone()
-	}
-
-	# ClearCachedCatalanG : Clear the cached digits of Catalan G constant.
-	static [void] ClearCachedCatalanG() {
-    	[BigNum]::cachedCatalanG = $null
 	}
 
 	# FeigenbaumA : Return the 1000 first digits of Feigenbaum A-constant.
@@ -2520,81 +2444,9 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return [BigNum]::new("2.5029078750958928222839028732182157863812713767271499773361920567792354631795902067032996497464338341295952318699958547239421823777854451792728633149933725781121635948795037447812609973805986712397117373289276654044010306698313834600094139322364490657889951220584317250787337746308785342428535198858750004235824691874082042817009017148230518216216194131998560661293827426497098440844701008054549677936760888126446406885181552709324007542506497157047047541993283178364533256241537869395712509706638797949265462313767459189098131167524342211101309131278371609511583412308415037164997020224681219644081216686527458043026245782561067150138521821644953254334987348741335279581535101658360545576351327650181078119483694595748502373982354526256327794753972699020128915166457939420198920248803394051699686551494477396533876979741232354061781989611249409599035312899773361184984737794610842883329383390395090089140863515256268033814146692799133107433497051435452013446434264752001621384610729922641994332772918").CloneWithAdjustedResolution()
 	}
 
-	# FeigenbaumA : (BigInteger) Return the $resolution first digits of Feigenbaum A-constant.
-	static [BigNum] FeigenbaumA([System.Numerics.BigInteger] $resolution) {
-		if($resolution -lt 0){
-			throw "Resolution for FeigenbaumA must be a null or positive integer"
-		}
-
-		if (-not [BigNum]::cachedFeigenbaumA) {
-        	[BigNum]::cachedFeigenbaumA = [BigNum]::FeigenbaumA()
-    	}
-
-		if ($resolution -le 1000) {
-			return [BigNum]::FeigenbaumA().Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		[BigNum] $tmpFA = 0
-		throw "FeigenbaumA does not support arbitrary lenght yet"
-
-		if ($resolution -le [BigNum]::cachedFeigenbaumA.getMaxDecimalResolution()) {
-			return [BigNum]::cachedFeigenbaumA.Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		# $tmpResolution = $resolution + 100
-		[BigNum] $tmpFA = 0
-
-		# Store at the new resolution
-		[BigNum]::cachedFeigenbaumA = $tmpFA.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
-
-		# Return the new value
-		return [BigNum]::cachedFeigenbaumA.Clone()
-	}
-
-	# ClearCachedFeigenbaumA : Clear the cached digits of Feigenbaum A-constant.
-	static [void] ClearCachedFeigenbaumA() {
-    	[BigNum]::cachedFeigenbaumA = $null
-	}
-
 	# FeigenbaumDelta : Return the 1000 first digits of Feigenbaum Delta-constant.
 	static [BigNum] FeigenbaumDelta() {
 		return [BigNum]::new("4.6692016091029906718532038204662016172581855774757686327456513430041343302113147371386897440239480138171659848551898151344086271420279325223124429888908908599449354632367134115324817142199474556443658237932020095610583305754586176522220703854106467494942849814533917262005687556659523398756038256372256480040951071283890611844702775854285419801113440175002428585382498335715522052236087250291678860362674527213399057131606875345083433934446103706309452019115876972432273589838903794946257251289097948986768334611626889116563123474460575179539122045562472807095202198199094558581946136877445617396074115614074243754435499204869180982648652368438702799649017397793425134723808737136211601860128186102056381818354097598477964173900328936171432159878240789776614391395764037760537119096932066998361984288981837003229412030210655743295550388845849737034727532121925706958414074661841981961006129640161487712944415901405467941800198133253378592493365883070459999938375411726563553016862529032210862320550634").CloneWithAdjustedResolution()
-	}
-
-	# FeigenbaumDelta : (BigInteger) Return the $resolution first digits of Feigenbaum Delta-constant.
-	static [BigNum] FeigenbaumDelta([System.Numerics.BigInteger] $resolution) {
-		if($resolution -lt 0){
-			throw "Resolution for FeigenbaumDelta must be a null or positive integer"
-		}
-
-		if (-not [BigNum]::cachedFeigenbaumDelta) {
-        	[BigNum]::cachedFeigenbaumDelta = [BigNum]::FeigenbaumDelta()
-    	}
-
-		if ($resolution -le 1000) {
-			return [BigNum]::FeigenbaumDelta().Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		[BigNum] $tmpFD = 0
-		throw "FeigenbaumDelta does not support arbitrary lenght yet"
-
-		if ($resolution -le [BigNum]::cachedFeigenbaumDelta.getMaxDecimalResolution()) {
-			return [BigNum]::cachedFeigenbaumDelta.Truncate($resolution).CloneWithNewResolution($resolution)
-		}
-
-		# $tmpResolution = $resolution + 100
-		[BigNum] $tmpFD = 0
-
-		# Store at the new resolution
-		[BigNum]::cachedFeigenbaumDelta = $tmpFD.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
-
-		# Return the new value
-		return [BigNum]::cachedFeigenbaumDelta.Clone()
-	}
-
-	# ClearCachedFeigenbaumDelta : Clear the cached digits of Feigenbaum Delta-constant.
-	static [void] ClearCachedFeigenbaumDelta() {
-    	[BigNum]::cachedFeigenbaumDelta = $null
 	}
 
 	# Sqrt2 : Return the 1000 first digits of Sqrt(2).
@@ -2746,6 +2598,20 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 
 	# ClearCachedCbrt3 : Clear the cached digits of Cbrt(3).
 	static [void] ClearCachedCbrt3() {
+    	[BigNum]::cachedCbrt3 = $null
+	}
+
+	# ClearAllCachedValues : Clear all the cached values.
+	static [void] ClearAllCachedValues() {
+		[BigNum]::cachedPi = $null
+		[BigNum]::cachedTau = $null
+		[BigNum]::cachedE = $null
+		[BigNum]::cachedPhi = $null
+		[BigNum]::cachedBernoulliNumberB = @{}
+		[BigNum]::cachedEulerMascheroniGamma = $null
+		[BigNum]::cachedSqrt2 = $null
+		[BigNum]::cachedSqrt3 = $null
+		[BigNum]::cachedCbrt2 = $null
     	[BigNum]::cachedCbrt3 = $null
 	}
 

@@ -105,10 +105,18 @@ $c = [BigNum]::c()        # Speed of light (exact)
 ## ⚙️ Resolution Control
 
 Each `BigNum` instance has a **maximum decimal resolution**.
+* list of cloning methods to alter the maximum decimal resolution (all create a new instance):
+  * `.CloneWithNewResolution()` → Make "maximum decimal resolution" to match "val", and truncate if needed
+  * `.CloneWithAddedResolution()` → Make "maximum decimal resolution" increase by "val"
+  * `.CloneWithAdjustedResolution()` → Shorten the "maximum decimal resolution" to the current decimal expansion lenght
+  * `.CloneAndReducePrecisionBy()` → Reduce "maximum decimal resolution" by "val", and round if needed
 
-* `.ChangeResolution()` → create a new instance with adjusted working precision
-* `.Crop()` → create a new instance croped to the desired length without rounding nor changing the resolution
-* Rounding methods: `.Round()`, `.RoundUp()`, `.RoundDown()`, `.RoundTowardZero()`, `.RoundAwayFromZero()`
+* list of Rounding methods (all create new instances, and leave maximum decimal resolution untouched):
+  * `.Round()` → Round to the the closest value of desired length, 0,5 are rounded away from zero
+  * `.Ceiling()` → Round to a bigger or equal value of desired length
+  * `.Floor()` → Round to a lower or equal value of desired length
+  * `.Truncate()` → Crop to the desired length without rounding
+  * `.RoundAwayFromZero()` → Round away from zero to the desired length
 
 Example:
 
@@ -136,13 +144,21 @@ $result = [BigNum]::NthRoot($val, [BigNum]"2.5")
 
 ### Cached Constants
 
-For performance, Pi, Tau, and e are cached internally.
+For performance, numerous constants are cached internally.
 To clear them:
 
 ```powershell
 [BigNum]::ClearCachedPi()
 [BigNum]::ClearCachedTau()
 [BigNum]::ClearCachedE()
+[BigNum]::ClearCachedPhi()
+[BigNum]::ClearCachedBernoulliNumberB() # Hashtable
+[BigNum]::ClearCachedEulerMascheroniGamma()
+[BigNum]::ClearCachedSqrt2()
+[BigNum]::ClearCachedSqrt3()
+[BigNum]::ClearCachedCbrt2()
+[BigNum]::ClearCachedCbrt3()
+[BigNum]::ClearAllCachedValues()
 ```
 
 ---
@@ -151,10 +167,10 @@ To clear them:
 
 * Negative numbers:
 
-  * `Sqrt()` and even `NthRootInt()` reject negative input.
+  * even-valued `NthRootInt()` and `Sqrt()` reject negative input.
   * `Pow()` does not support complex results (negative base with non-integer exponent).
 
-* Internal computations use temporarily higher precision for stability and crop the result.
+* Internal computations use temporarily higher precision for stability and truncate the result to match the input resolution.
 
 * Integer exponents are optimized internally for performance; non-integer exponents use general methods like `Exp(Ln(x) * n)`.
 
@@ -162,10 +178,8 @@ To clear them:
 
 ## 🧪 Planned Improvements
 
-* Modular exponentiation
 * Complex number support
-* Trigonometric functions
-* Performance optimizations (possible C# or parallelization)
+* Performance optimizations
 
 ---
 
