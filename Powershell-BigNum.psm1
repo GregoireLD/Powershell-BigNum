@@ -107,10 +107,35 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 	
 	#region direct Accessors and evaluation tools
 
-	# getMaxDecimalResolution : returns the maximum allowed decimal expansion of the BigNum.
+	# getMaxDecimalResolution : returns the maximum allowed decimal expansion of the BigComplex.
 	[System.Numerics.BigInteger]getMaxDecimalResolution(){
 
 		return [System.Numerics.BigInteger]::Min($this.realPart.getMaxDecimalResolution(),$this.imaginaryPart.getMaxDecimalResolution())
+	}
+
+	# getDecimalExpantionLength : returns the current decimal expansion of the BigNum.
+	[System.Numerics.BigInteger]getDecimalExpantionLength(){
+		return [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpantionLength(),$this.imaginaryPart.getDecimalExpantionLength())
+	}
+
+	# IsStrictlyNegative : returns $true only if the number is strictly negative.
+	[bool] IsStrictlyNegative(){
+		return ($this.realPart.IsStrictlyNegative() -and ($this.imaginaryPart.IsStrictlyNegative() -or $this.imaginaryPart.IsNull()))
+	}
+
+	# IsNegative : returns $true if the number is negative or null.
+	[bool] IsNegative(){
+		return ($this.realPart.IsNegative() -and ($this.imaginaryPart.IsNegative() -or $this.imaginaryPart.IsNull()))
+	}
+
+	# IsStrictlyPositive : returns $true only if the number is strictly positive.
+	[bool] IsStrictlyPositive(){
+		return ($this.realPart.IsStrictlyPositive() -and ($this.imaginaryPart.IsStrictlyPositive() -or $this.imaginaryPart.IsNull()))
+	}
+
+	# IsPositive : returns $true if the number is positive or null.
+	[bool] IsPositive(){
+		return ($this.realPart.IsPositive() -and ($this.imaginaryPart.IsPositive() -or $this.imaginaryPart.IsNull()))
 	}
 
 	# IsNull : returns $true if the number is null.
@@ -131,6 +156,16 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 	# IsReal : returns $true if the number has no real Part.
 	[bool] IsPureImaginary(){
 		return ($this.realPart.IsNull())
+	}
+
+	# IsInteger : returns $true if the number has no decimal expansion.
+	[bool] IsInteger() {
+		return ($this.realPart.IsInteger() -and $this.imaginaryPart.IsInteger())
+	}
+
+	# HasDecimals : returns $true if the number has any decimal expansion.
+	[bool] HasDecimals() {
+		return ($this.realPart.HasDecimals() -or $this.imaginaryPart.HasDecimals())
 	}
 
 	#endregion direct Accessors and evaluation tools
@@ -214,14 +249,16 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 		if ($null -eq $other) {return 1}
 
 		if ($other.GetType() -eq $this.GetType()) {
-			[BigNum] $tmpOther = $other.Clone()
+			[BigComplex] $tmpOther = $other.Clone()
 		} else {
-			[BigNum] $tmpOther = [BigNum]::CloneFromObject($other)
+			[BigComplex] $tmpOther = [BigComplex]::CloneFromObject($other)
 		}
 
-		if (($this.realPart -eq $tmpOther.realPart) -and ($this.imaginaryPart -eq $tmpOther.imaginaryPart)) { return 0 }
+		# if (($this.realPart -eq $tmpOther.realPart) -and ($this.imaginaryPart -eq $tmpOther.imaginaryPart)) { return 0 }
 
-		# if ($tmpThis -lt $tmpOtherInt) {return -1 } # -lt
+		if ($this.MagnitudeSquared() -eq $tmpOther.MagnitudeSquared()) {return 0 } # -eq
+
+		if ($this.MagnitudeSquared() -lt $tmpOther.MagnitudeSquared()) {return -1 } # -lt
 
 		return 1 # -gt
     }
@@ -1406,6 +1443,31 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 
 	#region instance Methods
 
+	# Conjugate : Return a clone containing the conjugate original BigNum.
+	[BigComplex] Conjugate() {
+        return [BigComplex]::new($this.realPart, -$this.imaginaryPart)
+    }
+
+	# Abs : Alias of Magnitude.
+	[BigNum] Abs() {
+		return $this.Magnitude()
+	}
+
+	# Magnitude : Return the Magnitude (Modulus) of the original BigNum.
+	[BigNum] Magnitude() {
+		return [BigNum]::Sqrt($this.MagnitudeSquared())
+	}
+
+	# MagnitudeSquared : Return the squared Magnitude (Modulus) of the original BigNum.
+	[BigNum] MagnitudeSquared() {
+        return [BigNum]::Pow($this.realPart, 2) + [BigNum]::Pow($this.imaginaryPart, 2)
+    }
+
+	# Arg : Return a clone containing the argument of the original BigNum.
+	[BigNum] Arg() {
+        return [BigNum]::Atan2($this.imaginaryPart, $this.realPart)
+    }
+
 	# Real : Return a BigNum contaning the real part of the original value.
 	[BigNum] Real() {
 		return $this.realPart.Clone()
@@ -1416,7 +1478,7 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 		return [BigComplex]::new(0,$this.imaginaryPart)
 	}
 
-	# Imaginary : Return a BigNum contaning the imaginary factor of the original value.
+	# ImaginaryFactor : Return a BigNum contaning the imaginary factor of the original value.
 	[BigNum] ImaginaryFactor() {
 		return $this.imaginaryPart.Clone()
 	}
@@ -1446,196 +1508,30 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 		return $strBuilder
 	}
 
-	# # Round : Return a clone of the original BigNum rounded to $decimals digits, using the half-up rule.
-	# [BigNum] Round([System.Numerics.BigInteger]$decimals){
-	# 	$alteration = 0
-	# 	# if ($this.negativeFlag) { $alteration = -1 }
+	# Round : Return a clone of the original BigNum rounded to $decimals digits, using the half-up rule.
+	[BigComplex] Round([System.Numerics.BigInteger]$decimals){
+		return [BigComplex]::new($this.Round($decimals),$this.Round($decimals))
+	}
 
-	# 	$newValStr += "" + "0" + $this.integerVal.ToString()
-	# 	[System.Numerics.BigInteger]$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-	# 	$toRound = $this.shiftVal - $decimals
-	# 	$newShift = $this.shiftVal
+	# Ceiling : Return a clone of the original BigNum rounded to $decimals digits, using the always up rule.
+	[BigComplex] Ceiling([System.Numerics.BigInteger]$decimals){
+		return [BigComplex]::new($this.Ceiling($decimals),$this.Ceiling($decimals))
+	}
 
-	# 	if ($toRound -gt 0) {
-	# 		if ($toRound -gt ($newValStr.Length - 1)) {
-	# 			$newVal = "0"
-	# 			$newShift = "0"
-	# 		}else{
+	# Floor : Return a clone of the original BigNum rounded to $decimals digits, using the always down rule.
+	[BigComplex] Floor([System.Numerics.BigInteger]$decimals){
+		return [BigComplex]::new($this.Floor($decimals),$this.Floor($decimals))
+	}
 
-				
-	# 			if([int]::Parse($newValStr[-$toRound]) -ge 5){
-	# 				$alteration = 1
-	# 			}
+	# RoundAwayFromZero : Return a clone of the original BigNum rounded to $decimals digits, using the always Away-From-Zero rule.
+	[BigComplex] RoundAwayFromZero([System.Numerics.BigInteger]$decimals){
+		return [BigComplex]::new($this.RoundAwayFromZero($decimals),$this.RoundAwayFromZero($decimals))
+	}
 
-	# 			$newValStr = $newValStr.Substring(0,$newValStr.Length - $toRound)
-	# 			$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-				
-	# 			$newVal += $alteration
-	# 			$newShift = $decimals
-	# 		}
-			
-	# 	}
-
-	# 	return [BigNum]::new($newVal,$newShift,$this.negativeFlag,$this.maxDecimalResolution)
-	# }
-
-	# # Ceiling : Return a clone of the original BigNum rounded to $decimals digits, using the always up rule.
-	# [BigNum] Ceiling([System.Numerics.BigInteger]$decimals){
-	# 	$alteration = 1
-	# 	if ($this.negativeFlag) {
-	# 		$alteration = 0
-	# 	}
-
-	# 	$newValStr += "" + "0" + $this.integerVal.ToString()
-	# 	[System.Numerics.BigInteger]$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-	# 	$toRound = $this.shiftVal - $decimals
-	# 	$newShift = $this.shiftVal
-	# 	$newSign = $this.negativeFlag
-
-	# 	if ($toRound -gt 0) {
-	# 		if ($toRound -gt ($newValStr.Length - 1)) {
-	# 			$newVal = "0"
-	# 			if (($this.integerVal -ne 0) -and (-not $this.negativeFlag)) {
-	# 				$newVal = [BigNum]::PowTenPositive($toRound - $this.shiftVal)
-	# 			}
-	# 			$newSign = $false
-	# 			$newShift = "0"
-	# 		}else{
-
-	# 			$rest = $newValStr.Substring($newValStr.Length - $toRound,$toRound)
-	# 			$valRest = [System.Numerics.BigInteger]::Parse($rest)
-	# 			if ($valRest -eq 0) {
-	# 				$alteration = 0
-	# 			}
-
-	# 			$newValStr = $newValStr.Substring(0,$newValStr.Length - $toRound)
-	# 			$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-	# 			if ($newVal -eq 0) {
-	# 				$newSign = $false
-	# 			}
-				
-	# 			$newVal += $alteration
-	# 			$newShift = $decimals
-	# 		}
-			
-	# 	}
-
-	# 	return [BigNum]::new($newVal,$newShift,$newSign,$this.maxDecimalResolution)
-	# }
-
-	# # Floor : Return a clone of the original BigNum rounded to $decimals digits, using the always down rule.
-	# [BigNum] Floor([System.Numerics.BigInteger]$decimals){
-	# 	$alteration = 0
-	# 	if ($this.negativeFlag) {
-	# 		$alteration = 1
-	# 	}
-
-	# 	$newValStr += "" + "0" + $this.integerVal.ToString()
-	# 	[System.Numerics.BigInteger]$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-	# 	$toRound = $this.shiftVal - $decimals
-	# 	$newShift = $this.shiftVal
-	# 	$newSign = $this.negativeFlag
-
-	# 	if ($toRound -gt 0) {
-	# 		if ($toRound -gt ($newValStr.Length - 1)) {
-	# 			$newVal = "0"
-	# 			$newSign = $false
-	# 			if (($this.integerVal -ne 0) -and ($this.negativeFlag)) {
-	# 				$newVal = [BigNum]::PowTenPositive($toRound - $this.shiftVal)
-	# 				$newSign = $true
-	# 			}
-	# 			$newShift = "0"
-	# 		}else{
-
-	# 			$rest = $newValStr.Substring($newValStr.Length - $toRound,$toRound)
-	# 			$valRest = [System.Numerics.BigInteger]::Parse($rest)
-	# 			if ($valRest -eq 0) {
-	# 				$alteration = 0
-	# 			}
-
-	# 			$newValStr = $newValStr.Substring(0,$newValStr.Length - $toRound)
-	# 			$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-	# 			if (($newVal -eq 0) -and ($alteration -eq 0)) {
-	# 				$newSign = $false
-	# 			}
-				
-	# 			$newVal += $alteration
-	# 			$newShift = $decimals
-	# 		}
-	# 	}
-
-	# 	return [BigNum]::new($newVal,$newShift,$newSign,$this.maxDecimalResolution)
-	# }
-
-	# # RoundAwayFromZero : Return a clone of the original BigNum rounded to $decimals digits, using the always Away-From-Zero rule.
-	# [BigNum] RoundAwayFromZero([System.Numerics.BigInteger]$decimals){
-	# 	$alteration = 1
-
-	# 	$newValStr += "" + "0" + $this.integerVal.ToString()
-	# 	[System.Numerics.BigInteger]$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-	# 	$toRound = $this.shiftVal - $decimals
-	# 	$newShift = $this.shiftVal
-	# 	$newSign = $this.negativeFlag
-
-	# 	if ($toRound -gt 0) {
-	# 		if ($toRound -gt ($newValStr.Length - 1)) {
-	# 			$newVal = "0"
-	# 			if (($this.integerVal -ne 0)) {
-	# 				$newVal = [BigNum]::PowTenPositive($toRound - $this.shiftVal)
-	# 			}
-	# 			$newShift = "0"
-	# 		}else{
-
-	# 			$rest = $newValStr.Substring($newValStr.Length - $toRound,$toRound)
-	# 			$valRest = [System.Numerics.BigInteger]::Parse($rest)
-	# 			if ($valRest -eq 0) {
-	# 				$alteration = 0
-	# 			}
-
-	# 			$newValStr = $newValStr.Substring(0,$newValStr.Length - $toRound)
-	# 			$newVal = [System.Numerics.BigInteger]::Parse($newValStr)
-	# 			if (($newVal -eq 0) -and ($alteration -eq 0)) {
-	# 				$newSign = $false
-	# 			}
-				
-	# 			$newVal += $alteration
-	# 			$newShift = $decimals
-	# 		}
-	# 	}
-
-	# 	return [BigNum]::new($newVal,$newShift,$newSign,$this.maxDecimalResolution)
-	# }
-
-	# # Truncate : Return a clone of the original BigNum truncated to $decimals digits. This function doest not round, just cut.
-	# [BigNum] Truncate([System.Numerics.BigInteger]$decimals) {
-	# 	$tmpVal = [System.Numerics.BigInteger]::Parse($this.integerVal)
-	# 	[string]$tmpString = $tmpVal.ToString()
-	# 	$tmpShift = [System.Numerics.BigInteger]::Parse($this.shiftVal)
-	# 	$tmpSign = $this.negativeFlag
-	# 	$tmpResolution = [System.Numerics.BigInteger]::Parse($this.maxDecimalResolution)
-
-	# 	if($tmpShift -gt $decimals) {
-	# 		[System.Numerics.BigInteger]$newEnd = [System.Numerics.BigInteger]::Parse(0)
-	# 		$newEnd += $tmpString.Length - $tmpShift + $decimals
-
-	# 		if ($newEnd -gt 0) {
-	# 			$tmpVal = [System.Numerics.BigInteger]::Parse($tmpString.Substring(0,$newEnd))
-
-	# 			if ($decimals -ge 0) {
-	# 				$tmpShift = [System.Numerics.BigInteger]::Parse($decimals)
-	# 			}else{
-	# 				$tmpShift = [System.Numerics.BigInteger]::Parse(0)
-	# 				$tmpVal *= [BigNum]::PowTenPositive(-$decimals)
-	# 			}
-	# 		}else{
-	# 			$tmpShift = [System.Numerics.BigInteger]::Parse(0)
-	# 			$tmpVal = [System.Numerics.BigInteger]::Parse(0)
-	# 			$tmpSign = $false
-	# 		}
-	# 	}
-
-	# 	return [BigNum]::new($tmpVal,$tmpShift,$tmpSign,$tmpResolution)
-	# }
+	# Truncate : Return a clone of the original BigNum truncated to $decimals digits. This function doest not round, just cut.
+	[BigComplex] Truncate([System.Numerics.BigInteger]$decimals) {
+		return [BigComplex]::new($this.Truncate($decimals),$this.Truncate($decimals))
+	}
 
 	#endregion instance Methods
 
@@ -3341,7 +3237,7 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 		return [System.Numerics.BigInteger]::Parse($this.Truncate(0))
 	}
 
-	# Abs : Return a clone containing the absulute value of the original BigNum.
+	# Abs : Return a clone containing the absolute value of the original BigNum.
 	[BigNum] Abs() {
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$false,$this.maxDecimalResolution)
 	}
