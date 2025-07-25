@@ -46,7 +46,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# Init : INTERNAL USE. Initialise and clean up all internal values of a BigNum instance.
 	hidden [void] Init([BigNum]$ar,[BigNum]$bi) {
-		[System.Numerics.BigInteger] $newResolution = [System.Numerics.BigInteger]::Max($ar.getMaxDecimalResolution(),$bi.getMaxDecimalResolution())
+		[System.Numerics.BigInteger] $newResolution = [System.Numerics.BigInteger]::Max($ar.GetMaxDecimalResolution(),$bi.GetMaxDecimalResolution())
 		
 		$this.realPart = $ar.CloneWithNewResolution($newResolution)
         $this.imaginaryPart = $bi.CloneWithNewResolution($newResolution)
@@ -124,10 +124,10 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	
 	#region direct Accessors and evaluation tools
 
-	# getMaxDecimalResolution : returns the maximum allowed decimal expansion of the BigComplex.
-	[System.Numerics.BigInteger]getMaxDecimalResolution(){
+	# GetMaxDecimalResolution : returns the maximum allowed decimal expansion of the BigComplex.
+	[System.Numerics.BigInteger]GetMaxDecimalResolution(){
 
-		return [System.Numerics.BigInteger]::Min($this.realPart.getMaxDecimalResolution(),$this.imaginaryPart.getMaxDecimalResolution())
+		return [System.Numerics.BigInteger]::Min($this.realPart.GetMaxDecimalResolution(),$this.imaginaryPart.GetMaxDecimalResolution())
 	}
 
 	# getDecimalExpantionLength : returns the current decimal expansion of the BigNum.
@@ -243,7 +243,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "Error in [BigComplex]::CloneAndReducePrecisionBy : length must be positive or null"
 		}
 		
-		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.getMaxDecimalResolution(),$this.imaginaryPart.getMaxDecimalResolution())
+		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.GetMaxDecimalResolution(),$this.imaginaryPart.GetMaxDecimalResolution())
 		
 		$newLength = $newResolution - $length
 
@@ -414,7 +414,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# op_Modulus : Standard overload for the "%" operator.
 	static [BigComplex] op_Modulus([BigComplex] $a, [BigComplex] $b) {
-		[System.Numerics.BigInteger]$newResolution = [System.Numerics.BigInteger]::Max($a.getMaxDecimalResolution(),$b.getMaxDecimalResolution())
+		[System.Numerics.BigInteger]$newResolution = [System.Numerics.BigInteger]::Max($a.GetMaxDecimalResolution(),$b.GetMaxDecimalResolution())
 
 		if($a.IsPureReal() -and $b.IsPureReal()) {
 			return ([BigComplex]($a.realPart % $b.realPart))
@@ -441,7 +441,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# 		$newShiftVal=0
 	# 	}
 
-	# 	return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.getMaxDecimalResolution())
+	# 	return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.GetMaxDecimalResolution())
 	# }
 
 	# # op_LeftShift : Standard overload for the ">>" operator.
@@ -449,7 +449,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# 	[System.Numerics.BigInteger]$tmpA = $a.integerVal
 	# 	[System.Numerics.BigInteger]$newShiftVal = $a.shiftVal + $b
 
-	# 	return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.getMaxDecimalResolution())
+	# 	return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.GetMaxDecimalResolution())
 	# }
 
 	# -bxor   op_ExclusiveOr
@@ -525,13 +525,13 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "[BigComplex]::Ln() error: logarithm is not defined for value = 0"
 		}
 
-		[BigNum] $tmpMagnitude = $value.CloneWithNewResolution($value.getMaxDecimalResolution()*2).Magnitude()
-		[BigNum] $tmpArg = $value.CloneWithNewResolution($value.getMaxDecimalResolution()*2).Arg()
+		[BigNum] $tmpMagnitude = $value.CloneWithNewResolution($value.GetMaxDecimalResolution()*2).Magnitude()
+		[BigNum] $tmpArg = $value.CloneWithNewResolution($value.GetMaxDecimalResolution()*2).Arg()
 
 		[BigNum] $tmpRealPart = [BigNum]::Ln($tmpMagnitude)
 		[BigNum] $tmpImaginaryPart = $tmpArg
 
-		return [BigComplex]::new($tmpRealPart, $tmpImaginaryPart).CloneWithNewResolution($value.getMaxDecimalResolution())
+		return [BigComplex]::new($tmpRealPart, $tmpImaginaryPart).CloneWithNewResolution($value.GetMaxDecimalResolution())
 	}
 
 	# Exp : Returns the value of e to the power $exponent.
@@ -552,17 +552,17 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "[BigComplex]::Log() error: logarithm is not defined for value = 0"
 		}
 
-		[BigComplex] $lnValue = [BigComplex]::Ln($value.CloneWithNewResolution($value.getMaxDecimalResolution()*2))
-		[BigComplex] $lnBase = [BigComplex]::Ln($base.CloneWithNewResolution($value.getMaxDecimalResolution()*2))
+		[BigComplex] $lnValue = [BigComplex]::Ln($value.CloneWithNewResolution($value.GetMaxDecimalResolution()*2))
+		[BigComplex] $lnBase = [BigComplex]::Ln($base.CloneWithNewResolution($value.GetMaxDecimalResolution()*2))
 
-		return ($lnValue / $lnBase).CloneWithNewResolution($value.getMaxDecimalResolution())
+		return ($lnValue / $lnBase).CloneWithNewResolution($value.GetMaxDecimalResolution())
 	}
 
 
 	# Pow : Returns the value of $value to the power $exponent. Dispaches to BigNum Pow as needed.
 	static [BigComplex] Pow([BigComplex] $base, [BigComplex] $exponent) {
 		if($base.IsNull()){
-			return ([BigComplex]0).CloneWithNewResolution([System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution))
+			return ([BigComplex]0).CloneWithNewResolution([System.Numerics.BigInteger]::Max($base.GetMaxDecimalResolution(),$exponent.GetMaxDecimalResolution()))
 		}
 
 		if($base.IsPureReal() -and $base.IsStrictlyPositive() -and $exponent.IsPureReal()){
@@ -578,7 +578,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# PowComplex : INTERNAL USE. Returns the value of $base to the power $exponent.
 	hidden static [BigComplex] PowComplex([BigComplex] $base, [BigComplex] $exponent) {
-		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($base.getMaxDecimalResolution(),$exponent.getMaxDecimalResolution())
+		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($base.GetMaxDecimalResolution(),$exponent.GetMaxDecimalResolution())
 		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 		
 
@@ -607,7 +607,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
         	return [BigNum]::Sqrt($value.realPart)
 		}
 
-		[System.Numerics.BigInteger] $targetRes = $value.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $targetRes = $value.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 
 		if ($value -eq "-1") {
@@ -649,7 +649,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			return [BigComplex]::NthRootInt($n.realPart.Int(),$value)
 		}
 
-		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($n.getMaxDecimalResolution(),$value.getMaxDecimalResolution())
+		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($n.GetMaxDecimalResolution(),$value.GetMaxDecimalResolution())
 		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 
 		$tmpValue = $value.CloneWithNewResolution($wrkRes)
@@ -668,7 +668,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "[BigNum]::NthRootInt() - n cannot be zero"
 		}
 
-		[System.Numerics.BigInteger] $targetRes = $value.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $targetRes = $value.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 
 		$tmpValue = $value.CloneWithNewResolution($wrkRes)
@@ -694,30 +694,14 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return [BigComplex]::new($tmpRealPart, $tmpImagPart).CloneWithNewResolution($targetRes)
 	}
 
-	# # ModPow : Returns the modular exponentiation of $base raisend to the power $exponent modulo $modulus. Calls ModPowPosInt if possible.
-	# static [BigNum] ModPow([BigNum] $base, [BigNum] $exponent, [BigNum] $modulus) {
-	# 	if ($base.IsInteger() -and $base.IsPositive() -and $exponent.IsInteger() -and $exponent.IsPositive() -and $modulus.IsInteger() -and $modulus.IsStrictlyPositive()) {
-	# 		return ([BigNum]::CloneFromObject([BigNum]::ModPowPosInt($base.Int(),$exponent.Int(),$modulus.Int())))
-	# 	}
-	# 	return ([BigNum]::Pow($base,$exponent) % $modulus).Clone()
-	# }
+	# ModPow : Returns the modular exponentiation of $base raisend to the power $exponent modulo $modulus. Calls ModPowPosInt if possible.
+	static [BigComplex] ModPow([BigComplex] $base, [BigComplex] $exponent, [BigComplex] $modulus) {
+		if ($base.IsPureReal() -and $exponent.IsPureReal() -and $modulus.IsPureReal()) {
+			return ([BigComplex]::new([BigNum]::ModPow($base.realPart.clone(),$exponent.realPart.clone(),$modulus.realPart.clone())))
+		}
 
-	# # ModPowPosInt : INTERNAL USE. Returns cryptographically-optimised modular exponentiation of $base raisend to the power $exponent modulo $modulus.
-	# static [System.Numerics.BigInteger] ModPowPosInt([System.Numerics.BigInteger] $base, [System.Numerics.BigInteger] $exponent, [System.Numerics.BigInteger] $modulus) {
-	# 	if ($base -lt 0) {
-	# 		throw "[BigNum]::ModPowPosInt() error: negative base not supported"
-	# 	}
-
-	# 	if ($exponent -lt 0) {
-	# 		throw "[BigNum]::ModPowPosInt() error: negative exponent not supported"
-	# 	}
-
-	# 	if ($modulus -le 0) {
-	# 		throw "[BigNum]::ModPowPosInt() error: modulus cannot be zero nor negative"
-	# 	}
-
-	# 	return [System.Numerics.BigInteger]::ModPow($base,$exponent,$modulus)
-	# }
+		return ([BigComplex]::Pow($base,$exponent) % $modulus).Clone()
+	}
 
 	# Factorial : Returns $value Factorial. Internaly calls FactorialIntMulRange.
 	static [BigComplex] Factorial([BigComplex] $z) {
@@ -727,7 +711,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex]$tmpZ = $z + 1
 
-		return [BigComplex]::Gamma($tmpZ).CloneWithNewResolution($z.getMaxDecimalResolution())
+		return [BigComplex]::Gamma($tmpZ).CloneWithNewResolution($z.GetMaxDecimalResolution())
 	}
 
 	# Gamma : Compute the value of the Gamma function for z.
@@ -741,7 +725,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			return [BigNum]::Gamma($z.realPart.Clone())
 		}
 
-		[System.Numerics.BigInteger] $targetRes = $z.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $targetRes = $z.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes+10
 
 		$tmpValue = $z.CloneWithNewResolution($wrkRes)
@@ -758,7 +742,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "[BigComplex]::GammaComplex(): pole at negative or null real integer z"
 		}
 		
-		[System.Numerics.BigInteger] $targetRes = $z.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $targetRes = $z.GetMaxDecimalResolution()
 		[BigNum] $targetResBN = [BigNum]::new($targetRes)
 		[System.Numerics.BigInteger] $wrkRes = ($targetResBN*1.1).Ceiling(0).Int()+10
 
@@ -775,8 +759,8 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		# 	throw "[BigNum]::LnGammaComplex(): z must be > 0  (use Gamma to get reflection)."
 		# }
 
-		[System.Numerics.BigInteger] $wrkRes = $z.getMaxDecimalResolution() + 10
-		[System.Numerics.BigInteger] $targetResolution = $z.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $z.GetMaxDecimalResolution() + 10
+		[System.Numerics.BigInteger] $targetResolution = $z.GetMaxDecimalResolution()
 		[BigComplex] $tmpZ = $z.CloneWithNewResolution($wrkRes)
 
 		# Pick Spouge parameter a
@@ -806,161 +790,163 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	#region static Trigonometry Methods
 
-	# # Sin: Sine Function.
-	# static [BigNum] Sin([BigNum] $val) {
+	# Sin: Sine Function.
+	static [BigComplex] Sin([BigComplex] $val) {
 		
-	# 	# Sin is defined on R
+		# Sin is defined on C
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constMinusOne = ([BigNum]"-1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constTau = [BigNum]::Tau($wrkRes)
+		if($val.IsPureReal()) {
+			return ([BigComplex]::new([BigNum]::Sin($val.realPart.Clone())))
+		}
+
+		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
+		[BigComplex] $twoI = ([BigComplex]"2i").CloneWithNewResolution($wrkRes)
+		[BigComplex] $expIz = [BigComplex]::Exp($i * $tmpVal)
+		[BigComplex] $expNegIz = [BigComplex]::Exp(-$i * $tmpVal)
+
+		[BigComplex] $result = ($expIz - $expNegIz) / $twoI
+
+		# [BigComplex] $result = (([BigComplex]::Exp(([BigComplex]"i").CloneWithNewResolution($wrkRes)*$tmpVal)) - ([BigComplex]::Exp(([BigComplex]"-i").CloneWithNewResolution($wrkRes)*$tmpVal))) /([BigComplex]"2i").CloneWithNewResolution($wrkRes)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Cos: Cosine Function.
+	static [BigComplex] Cos([BigComplex] $val) {
 		
-	# 	# Preliminary: reduce x to [-π, π] range
-	# 	[BigNum] $k = ($val / $constTau).Round(0)
-	# 	$term = $val - $k * $constTau
+		# Cos is defined on C
 
-	# 	[BigNum] $sum = $term.Clone()
-	# 	[BigNum] $x2 = $sum * $sum
-	# 	[System.Numerics.BigInteger] $n = 1
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $target = [BigNum]::PowTen(-$wrkRes)
+		if($val.IsPureReal()) {
+			return ([BigComplex]::new([BigNum]::Cos($val.realPart.Clone())))
+		}
 
-	# 	while ($true) {
-	# 		$term *= $constMinusOne * $x2
-	# 		$term /= [BigNum]::new( ($constTwo*$n) * ($constTwo*$n + $constOne) )
-	# 		$n += 1
-	# 		if ($term.Abs() -lt $target ) {
-	# 			break
-	# 		}
-	# 		$sum += $term
-	# 	}
+		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
-	# 	return $sum.Truncate($targetRes)
-	# }
+		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
+		[BigComplex] $two = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+		[BigComplex] $expIz = [BigComplex]::Exp($i * $tmpVal)
+		[BigComplex] $expNegIz = [BigComplex]::Exp(-$i * $tmpVal)
 
-	# # Cos: Cosine Function.
-	# static [BigNum] Cos([BigNum] $val) {
-		
-	# 	# Cos is defined on R
+		[BigComplex] $result = ($expIz + $expNegIz) / $two
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constMinusOne = ([BigNum]"-1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constTau = [BigNum]::Tau($wrkRes)
+	# Tan: Tangent Function.
+	static [BigComplex] Tan([BigComplex] $val) {
 
-	# 	# Preliminary: reduce x to [-π, π] range
-	# 	[BigNum] $k = ($val / $constTau).Round(0)
-	# 	$x = $val - $k * $constTau
-	# 	$term = $constOne.Clone()
+		# Tan is defined on C \ {Pi/2 + kPi, k in Z} (Cos != 0)
 
-	# 	[BigNum] $sum = $term.Clone()
-	# 	[BigNum] $x2 = $x * $x
-	# 	[System.Numerics.BigInteger] $n = 1
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $target = [BigNum]::PowTen(-$wrkRes)
+		if($val.IsPureReal()) {
+			return ([BigComplex]::new([BigNum]::Tan($val.realPart.Clone())))
+		}
 
-	# 	while ($true) {
-	# 		$term *= $constMinusOne * $x2
-	# 		$term /= [BigNum]::new( ($constTwo*$n) * ($constTwo*$n - $constOne) )
-	# 		$n += 1
-	# 		if ($term.Abs() -lt $target ) {
-	# 			break
-	# 		}
-	# 		$sum += $term
-	# 	}
+		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
-	# 	return $sum.Truncate($targetRes)
-	# }
+		[BigComplex] $sinZ = [BigComplex]::Sin($tmpVal)
+		[BigComplex] $cosZ = [BigComplex]::Cos($tmpVal)
 
-	# # Tan: Tangent Function.
-	# static [BigNum] Tan([BigNum] $val) {
+		# if (cosX.Abs() -lt [BigNum]::PowTen(-x.maxDecimalResolution + 2)) {
+		# 	throw "Tan(x) undefined: Cos(x) too close to zero."
+		# }
 
-	# 	# Tan is defined on R \ {Pi/2 + kPi, k in Z} (Cos != 0)
+		if($cosZ.IsNull()) {
+			throw "Tan(z) undefined: Cos(z) is null."
+		}
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		[BigComplex] $result = $sinZ / $cosZ
 
-	# 	[BigNum] $sinX = [BigNum]::Sin($val.CloneWithNewResolution($wrkRes))
-	# 	[BigNum] $cosX = [BigNum]::Cos($val.CloneWithNewResolution($wrkRes))
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# 	# if (cosX.Abs() -lt [BigNum]::PowTen(-x.maxDecimalResolution + 2)) {
-	# 	# 	throw "Tan(x) undefined: Cos(x) too close to zero."
-	# 	# }
+	# Csc: Cosecant Function.
+	static [BigComplex] Csc([BigComplex] $val) {
 
-	# 	if($cosX.IsNull()) {
-	# 		throw "Tan(x) undefined: Cos(x) is null."
-	# 	}
+		# Csc is defined on C \ {kPi, k in Z} (Sin != 0)
 
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	return ($sinX / $cosX).CloneWithNewResolution($targetRes)
-	# }
+		if($val.IsPureReal()) {
+			return ([BigComplex]::new([BigNum]::Csc($val.realPart.Clone())))
+		}
 
-	# # Csc: Cosecant Function.
-	# static [BigNum] Csc([BigNum] $val) {
+		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
-	# 	# Csc is defined on R \ {kPi, k in Z} (Sin != 0)
+		[BigComplex] $constOne = ([BigComplex]1).CloneWithNewResolution($wrkRes)
+		[BigComplex] $sinZ = [BigComplex]::Sin($tmpVal)
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		if($sinZ.IsNull()) {
+			throw "Csc(z) undefined: Sin(z) is null."
+		}
 
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $sinVal = [BigNum]::Sin($val.CloneWithNewResolution($wrkRes))
+		[BigComplex] $result = $constOne / $sinZ
 
-	# 	if($sinVal.IsNull()) {
-	# 		throw "Csc(x) undefined: Sin(x) is null."
-	# 	}
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# 	return ($constOne / $sinVal).CloneWithNewResolution($targetRes)
-	# }
+	# Sec: Secant Function.
+	static [BigComplex] Sec([BigComplex] $val) {
 
-	# # Sec: Secant Function.
-	# static [BigNum] Sec([BigNum] $val) {
+		# Sec is defined on C \ {Pi/2 + kPi, k in Z} (Cos != 0)
 
-	# 	# Sec is defined on R \ {Pi/2 + kPi, k in Z} (Cos != 0)
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		if($val.IsPureReal()) {
+			return ([BigComplex]::new([BigNum]::Sec($val.realPart.Clone())))
+		}
 
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $cosVal = [BigNum]::Cos($val.CloneWithNewResolution($wrkRes))
+		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
-	# 	if($cosVal.IsNull()) {
-	# 		throw "Sec(x) undefined: Cos(x) is null."
-	# 	}
+		[BigComplex] $constOne = ([BigComplex]1).CloneWithNewResolution($wrkRes)
+		[BigComplex] $cosZ = [BigComplex]::Cos($tmpVal)
 
-	# 	return ($constOne / $cosVal).CloneWithNewResolution($targetRes)
-	# }
+		if($cosZ.IsNull()) {
+			throw "Sec(z) undefined: Cos(z) is null."
+		}
 
-	# # Cot: Cotangent Function.
-	# static [BigNum] Cot([BigNum] $val) {
+		[BigComplex] $result = $constOne / $cosZ
 
-	# 	# Cot is defined on R \ {kPi, k in Z} (Sin != 0)
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+	# Cot: Cotangent Function.
+	static [BigComplex] Cot([BigComplex] $val) {
 
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $sinVal = [BigNum]::Cos($val.CloneWithNewResolution($wrkRes))
+		# Cot is defined on C \ {kPi, k in Z} (Sin != 0)
 
-	# 	if($sinVal.IsNull()) {
-	# 		throw "Cot(x) undefined: Sin(x) is null."
-	# 	}
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $tanVal = [BigNum]::Tan($val.CloneWithNewResolution($wrkRes))
+		if($val.IsPureReal()) {
+			return ([BigComplex]::new([BigNum]::Cot($val.realPart.Clone())))
+		}
 
-	# 	if($tanVal.IsNull()) {
-	# 		throw "Cot(x) undefined: Tan(x) is null."
-	# 	}
+		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
-	# 	return ($constOne / $tanVal).CloneWithNewResolution($targetRes)
-	# }
+		[BigComplex] $constOne = ([BigComplex]1).CloneWithNewResolution($wrkRes)
+		[BigComplex] $tanZ = [BigComplex]::Tan($tmpVal)
+
+		if($tanZ.IsNull()) {
+			throw "Cot(z) undefined: Tan(z) is null."
+		}
+
+		[BigComplex] $result = $constOne / $tanZ
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
 	# # Arcsin: Inverse Sine Function.
 	# static [BigNum] Arcsin([BigNum] $val) {
@@ -1406,7 +1392,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		$tmpAtan2 = [BigComplex]::Atan2($this)
 		
 		If($this.IsPureReal() -and $this.IsStrictlyNegative()) {
-		 	$tmpAtan2 = [BigNum]::Pi($this.getMaxDecimalResolution())
+		 	$tmpAtan2 = [BigNum]::Pi($this.GetMaxDecimalResolution())
 		}
         return $tmpAtan2.Clone()
     }
@@ -1419,11 +1405,11 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		$tmpAtan2 = [BigComplex]::Atan2($this)
 
 		If($this.IsPureReal() -and $this.realPart.IsStrictlyNegative()) {
-		 	$tmpAtan2 = [BigNum]::Pi($this.getMaxDecimalResolution())
+		 	$tmpAtan2 = [BigNum]::Pi($this.GetMaxDecimalResolution())
 		}
 		
 		if ($tmpAtan2.IsStrictlyNegative()) {
-			$tmpAtan2 += [BigNum]::Tau($this.getMaxDecimalResolution())
+			$tmpAtan2 += [BigNum]::Tau($this.GetMaxDecimalResolution())
 		}
 
         return $tmpAtan2.Clone()
@@ -1734,8 +1720,8 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	
 	#region direct Accessors and evaluation tools
 
-	# getMaxDecimalResolution : returns the maximum allowed decimal expansion of the BigNum.
-	[System.Numerics.BigInteger]getMaxDecimalResolution(){
+	# GetMaxDecimalResolution : returns the maximum allowed decimal expansion of the BigNum.
+	[System.Numerics.BigInteger]GetMaxDecimalResolution(){
 		return [System.Numerics.BigInteger]::Parse($this.maxDecimalResolution)
 	}
 
@@ -2096,7 +2082,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$newShiftVal=0
 		}
 
-		return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.getMaxDecimalResolution())
+		return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.GetMaxDecimalResolution())
 	}
 
 	# op_LeftShift : Standard overload for the ">>" operator.
@@ -2104,7 +2090,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[System.Numerics.BigInteger]$tmpA = $a.integerVal
 		[System.Numerics.BigInteger]$newShiftVal = $a.shiftVal + $b
 
-		return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.getMaxDecimalResolution())
+		return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.GetMaxDecimalResolution())
 	}
 
 	# -bxor   op_ExclusiveOr
@@ -2633,8 +2619,8 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		# ---------- reflection branch (z < 0) ----------------------
 		# working precision: requested + 10 guard digits
-		[System.Numerics.BigInteger] $wrk = $z.getMaxDecimalResolution() + 10
-		# [bigint] $targetRes = $z.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrk = $z.GetMaxDecimalResolution() + 10
+		# [bigint] $targetRes = $z.GetMaxDecimalResolution()
 		[BigNum] $tmpZ = $z.CloneWithNewResolution($wrk)
 
 		# sin(π z)
@@ -3493,7 +3479,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::Pi().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedPi.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedPi.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedPi.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
@@ -3558,7 +3544,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::Tau().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedTau.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedTau.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedTau.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
@@ -3592,7 +3578,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::e().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedE.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedE.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedE.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
@@ -3634,7 +3620,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::Phi().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedPhi.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedPhi.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedPhi.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
@@ -3895,7 +3881,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 				return [BigNum]::EulerMascheroniGamma().Truncate($resolution).CloneWithNewResolution($resolution)
 			}
 
-			if ($resolution -le [BigNum]::cachedEulerMascheroniGamma.getMaxDecimalResolution()) {
+			if ($resolution -le [BigNum]::cachedEulerMascheroniGamma.GetMaxDecimalResolution()) {
 				return [BigNum]::cachedEulerMascheroniGamma.Truncate($resolution).CloneWithNewResolution($resolution)
 			}
 		}
@@ -4012,7 +3998,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::Sqrt2().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedSqrt2.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedSqrt2.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedSqrt2.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
@@ -4050,7 +4036,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::Sqrt3().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedSqrt3.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedSqrt3.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedSqrt3.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
@@ -4088,7 +4074,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::Cbrt2().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedCbrt2.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedCbrt2.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedCbrt2.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
@@ -4126,7 +4112,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			return [BigNum]::Cbrt3().Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
-		if ($resolution -le [BigNum]::cachedCbrt3.getMaxDecimalResolution()) {
+		if ($resolution -le [BigNum]::cachedCbrt3.GetMaxDecimalResolution()) {
 			return [BigNum]::cachedCbrt3.Truncate($resolution).CloneWithNewResolution($resolution)
 		}
 
