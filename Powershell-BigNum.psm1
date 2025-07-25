@@ -412,17 +412,24 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return [BigComplex]::new($resultReal, $resultImag)
 	}
 
-	# # op_Modulus : Standard overload for the "%" operator.
-	# static [BigNum] op_Modulus([BigNum] $a, [BigNum] $b) {
+	# op_Modulus : Standard overload for the "%" operator.
+	static [BigComplex] op_Modulus([BigComplex] $a, [BigComplex] $b) {
+		[System.Numerics.BigInteger]$newResolution = [System.Numerics.BigInteger]::Max($a.getMaxDecimalResolution(),$b.getMaxDecimalResolution())
 
-	# 	[BigNum]$tmpA = $a.Clone()
-	# 	[BigNum]$tmpB = $b.Clone()
+		if($a.IsPureReal() -and $b.IsPureReal()) {
+			return ([BigComplex]($a.realPart % $b.realPart))
+		}
 
-	# 	[System.Numerics.BigInteger]$newDecimalResolution = [System.Numerics.BigInteger]::Max($a.maxDecimalResolution,$b.maxDecimalResolution)
-	# 	[System.Numerics.BigInteger]$tmpDiv = [BigNum]::EuclideanDiv($tmpA,$tmpB)
-	# 	[BigNum]$tmpResult = $tmpA - ($tmpB*$([BigNum]::CloneFromObject($tmpDiv)))
-	# 	return $tmpResult.CloneWithNewResolution($newDecimalResolution)
-	# }
+		[BigComplex]$tmpA = $a.CloneWithNewResolution($newResolution)
+		[BigComplex]$tmpB = $b.CloneWithNewResolution($newResolution)
+
+		[BigComplex]$quotient = $tmpA/$tmpB
+		[BigComplex]$nearestInt = $quotient.Round(0)
+
+		[BigComplex]$tmpResult = $tmpA - ($tmpB * $nearestInt)
+
+		return $tmpResult.CloneWithNewResolution($newResolution)
+	}
 
 	# # op_LeftShift : Standard overload for the "<<" operator.
 	# static [BigNum] op_LeftShift([BigNum] $a, [System.Numerics.BigInteger] $b) {
@@ -750,7 +757,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		if ($z.IsPureReal() -and $z.IsInteger() -and $z.IsNegative()) {
 			throw "[BigComplex]::GammaComplex(): pole at negative or null real integer z"
 		}
-
+		
 		[System.Numerics.BigInteger] $targetRes = $z.getMaxDecimalResolution()
 		[BigNum] $targetResBN = [BigNum]::new($targetRes)
 		[System.Numerics.BigInteger] $wrkRes = ($targetResBN*1.1).Ceiling(0).Int()+10
@@ -792,33 +799,6 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		return $LnGammaResult.Truncate($targetResolution)
 	}
-
-	# # GammaNeg : INTERNAL USE. Compute the value of the Gamma function for negative z.
-	# hidden static [BigNum] GammaNeg( [BigNum] $z ){
-
-	# 	# ---------- reflection branch (z < 0) ----------------------
-	# 	# working precision: requested + 10 guard digits
-	# 	[System.Numerics.BigInteger] $wrk = $z.getMaxDecimalResolution() + 10
-	# 	# [bigint] $targetRes = $z.getMaxDecimalResolution()
-	# 	[BigNum] $tmpZ = $z.CloneWithNewResolution($wrk)
-
-	# 	# sin(π z)
-	# 	[BigNum] $adaptPi    = [BigNum]::Pi($wrk+5)
-	# 	[BigNum] $sinPZ = [BigNum]::Sin($adaptPi * $tmpZ)  # you said sin works
-
-	# 	# if sin(πz) too small, raise guard digits automatically
-	# 	if ($sinPZ.Abs() -lt [BigNum]::PowTen(-($wrk+5))) {
-	# 		$wrk += 20         # adaptive bump
-	# 		[BigNum] $adaptPi    = [BigNum]::Pi($wrk+5)
-	# 		$sinPZ  = [BigNum]::Sin($adaptPi * $tmpZ)
-	# 	}
-
-	# 	[BigNum] $oneMinusZ = ( [BigNum]::new(1).CloneWithNewResolution($wrk) - $tmpZ )
-	# 	[BigNum] $gamma1mz  = [BigNum]::GammaPos($oneMinusZ)            # positive argument
-
-	# 	[BigNum] $result = ( $adaptPi / $sinPZ ) / $gamma1mz
-	# 	return $result.Clone()
-	# }
 
 	#endregion static Operators and Methods
 
@@ -1424,9 +1404,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "[BigComplex]::Arg() : not defined for z = 0"
 		}
 		$tmpAtan2 = [BigComplex]::Atan2($this)
-		# If($tmpAtan2.IsStrictlyNegative()) {
-		# 	$tmpAtan2 += [BigNum]::Tau($this.getMaxDecimalResolution())
-		# }
+		
 		If($this.IsPureReal() -and $this.IsStrictlyNegative()) {
 		 	$tmpAtan2 = [BigNum]::Pi($this.getMaxDecimalResolution())
 		}
@@ -1464,6 +1442,19 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# ImaginaryFactor : Return a BigNum contaning the imaginary factor of the original value.
 	[BigNum] ImaginaryFactor() {
 		return $this.imaginaryPart.Clone()
+	}
+
+	# FractionalPart : Return a clone containing the Fractional Part of the original BigNum.
+	[BigComplex] FractionalPart() {
+		$tmpVal = $this.Clone()
+
+		[BigNum] $tmpRe = $tmpVal.realPart.Clone()
+		[BigNum] $tmpIm = $tmpVal.imaginaryPart.Clone()
+
+		$tmpRe -= $tmpRe.Truncate(0)
+		$tmpIm -= $tmpIm.Truncate(0)
+
+		return [BigComplex]::new($tmpRe,$tmpIm)
 	}
 
 	# Round : Return a clone of the original BigNum rounded to $decimals digits, using the half-up rule.
@@ -3273,6 +3264,13 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Abs : Return a clone containing the absolute value of the original BigNum.
 	[BigNum] Abs() {
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$false,$this.maxDecimalResolution)
+	}
+
+	# FractionalPart : Return a clone containing the Fractional Part of the original BigNum.
+	[BigNum] FractionalPart() {
+		$tmpval = $this.Clone()
+		$tmpval -= $tmpval.Truncate(0)
+		return $tmpval.Clone()
 	}
 
 	# Round : Return a clone of the original BigNum rounded to $decimals digits, using the half-up rule.
