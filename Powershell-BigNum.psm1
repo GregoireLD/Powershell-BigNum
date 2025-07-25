@@ -541,78 +541,40 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return ($lnValue / $lnBase).CloneWithNewResolution($value.getMaxDecimalResolution())
 	}
 
-	# # ToDo
-	# # Pow : Returns the value of $value to the power $exponent. Dispaches to PowTen, PowTenPositive, PowInt, and PowFloat as needed.
-	# static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
-	# 	if(($value -eq 10) -and $exponent.IsInteger()){
-	# 		return [BigNum]::PowTen($exponent.Int())
-	# 	}
-	# 	if($exponent.IsInteger() -and $exponent.IsInteger() -and $exponent.IsPositive()) {
-	# 		return [BigNum]::PowInt($value, $exponent.Int())
-	# 	}
-	# 	return [BigNum]::PowFloat($value, $exponent)
-	# }
 
-	# # PowTen : INTERNAL USE. Returns the value of 10 to the power $exponent. $exponent must be an integer. Dispaches to PowTenPositive if needed.
-	# hidden static [BigNum] PowTen([System.Numerics.BigInteger] $exponent) {
-	# 	if ($exponent -ge 0) { return [BigNum]::CloneFromObject([BigNum]::PowTenPositive($exponent)) }
-	# 	$tmpExp = -$exponent
-	# 	return [BigNum]::new(1,$tmpExp,$false,$tmpExp)
-	# }
+	# Pow : Returns the value of $value to the power $exponent. Dispaches to BigNum Pow as needed.
+	static [BigComplex] Pow([BigComplex] $base, [BigComplex] $exponent) {
+		if($base.IsPureReal() -and $exponent.IsPureReal()){
+			return ([BigComplex]([BigNum]::Pow($base.realPart,$exponent.realPart)))
+		}
 
-	# # PowTenPositive : INTERNAL USE. Returns the value of 10 to the power $exponent. $exponent must be a null or positive integer.
-	# hidden static [System.Numerics.BigInteger] PowTenPositive([System.Numerics.BigInteger] $exponent) {
-	# 	if ($exponent -lt 0) {
-	# 		throw "[BigNum]::PowTenPositive is only to be used with positive or null exponents. For negative exponents, use [BigNum]::Pow instead."
-	# 	}
+		return [BigComplex]::PowComplex($base, $exponent)
+	}
 
-	# 	if($exponent -eq 0) {return [System.Numerics.BigInteger]::Parse(1)}
+	# PowComplex : INTERNAL USE. Returns the value of $base to the power $exponent.
+	hidden static [BigComplex] PowComplex([BigComplex] $base, [BigComplex] $exponent) {
+		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($base.getMaxDecimalResolution(),$exponent.getMaxDecimalResolution())
+		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
+		
 
-	# 	[System.Numerics.BigInteger] $residualExp = [System.Numerics.BigInteger]::Parse($exponent);
-	# 	[System.Numerics.BigInteger] $total = 1
-	# 	[System.Numerics.BigInteger] $maxPow = 0
+		if ($base.IsNull()) {
+			if ($exponent.IsNull()) {
+				throw "0^0 is undefined"
+			} elseif ($exponent.IsPureReal() -and $exponent.IsStrictlyPositive()) {
+				return ([BigComplex]0).CloneWithNewResolution($targetRes)
+			} else {
+				throw "Error in [BigComplex]::PowComplex : 0^x is undefined for complex or negative exponents"
+			}
+		}
 
-    #  	while ($residualExp -gt [int16]::MaxValue) {
-	# 		if ($maxPow -eq 0) {
-	# 			$maxPow = [System.Numerics.BigInteger]::Pow(10, [int16]::MaxValue);
-	# 		}
-    #     	$residualExp -= [int16]::MaxValue
-    #     	$total *= $maxPow
-    #  	}
+		[BigComplex] $tmpBase = $base.CloneWithNewResolution($wrkRes)
+		[BigComplex] $tmpExponent = $exponent.CloneWithNewResolution($wrkRes)
 
-    #  	$total *= [System.Numerics.BigInteger]::Pow(10, [int16]$residualExp)
-
-	# 	return [System.Numerics.BigInteger]::Parse($total)
-	# }
-
-	# # PowInt : INTERNAL USE. Returns the value of $value to the power $exponent. $exponent must be an integer.
-	# hidden static [BigNum] PowInt([BigNum] $value, [System.Numerics.BigInteger] $exponent) {
-	# 	[System.Numerics.BigInteger] $residualExp = [System.Numerics.BigInteger]::Parse($exponent);
-	# 	[System.Numerics.BigInteger] $intValue = [System.Numerics.BigInteger]::Parse($value.integerVal)
-	# 	if ($value.IsStrictlyNegative()) { $intValue *= -1 }
-	# 	[System.Numerics.BigInteger] $shiftValue = [System.Numerics.BigInteger]::Parse($value.shiftVal)
-	# 	[System.Numerics.BigInteger] $total = 1
-	# 	[System.Numerics.BigInteger] $maxPow = 0
-
-    #  	while ($residualExp -gt [int16]::MaxValue) {
-	# 		if ($maxPow -eq 0) {
-	# 			$maxPow = [System.Numerics.BigInteger]::Pow($intValue, [int16]::MaxValue);
-	# 		}
-    #     	$residualExp -= [int16]::MaxValue
-    #     	$total *= $maxPow
-    #  	}
-
-    #  	$total *= [System.Numerics.BigInteger]::Pow($intValue, [int16]$residualExp);
-	# 	return [BigNum]::new($total,$shiftValue*$exponent,$false,$value.maxDecimalResolution)
-	# }
-
-	# # PowFloat : INTERNAL USE. Returns the value of $value to the power $exponent.
-	# hidden static [BigNum] PowFloat([BigNum] $value, [BigNum] $exponent) {
-	# 	if ($value.negativeFlag) {
-	# 		throw "[BigNum]::Pow is not capable of handling complex value output"
-	# 	}
-	# 	return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($value)))),$value.maxDecimalResolution)
-	# }
+		[BigComplex] $logBase = [BigComplex]::Ln($tmpBase)
+		[BigComplex] $exponentTimesLog = $tmpExponent * $logBase
+		[BigComplex] $result = [BigComplex]::Exp($exponentTimesLog)
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
 	# # Sqrt : Returns the value of the Square Root of $value using the Newton-Raphson algorithm.
 	# static [BigNum] Sqrt([BigNum] $value) {
@@ -2381,14 +2343,14 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	}
 
 	# Pow : Returns the value of $value to the power $exponent. Dispaches to PowTen, PowTenPositive, PowInt, and PowFloat as needed.
-	static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
-		if(($value -eq 10) -and $exponent.IsInteger()){
+	static [BigNum] Pow([BigNum] $base, [BigNum] $exponent) {
+		if(($base -eq 10) -and $exponent.IsInteger()){
 			return [BigNum]::PowTen($exponent.Int())
 		}
 		if($exponent.IsInteger() -and $exponent.IsInteger() -and $exponent.IsPositive()) {
-			return [BigNum]::PowInt($value, $exponent.Int())
+			return [BigNum]::PowInt($base, $exponent.Int())
 		}
-		return [BigNum]::PowFloat($value, $exponent)
+		return [BigNum]::PowFloat($base, $exponent)
 	}
 
 	# PowTen : INTERNAL USE. Returns the value of 10 to the power $exponent. $exponent must be an integer. Dispaches to PowTenPositive if needed.
@@ -2424,32 +2386,34 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	}
 
 	# PowInt : INTERNAL USE. Returns the value of $value to the power $exponent. $exponent must be an integer.
-	hidden static [BigNum] PowInt([BigNum] $value, [System.Numerics.BigInteger] $exponent) {
+	hidden static [BigNum] PowInt([BigNum] $base, [System.Numerics.BigInteger] $exponent) {
 		[System.Numerics.BigInteger] $residualExp = [System.Numerics.BigInteger]::Parse($exponent);
-		[System.Numerics.BigInteger] $intValue = [System.Numerics.BigInteger]::Parse($value.integerVal)
-		if ($value.IsStrictlyNegative()) { $intValue *= -1 }
-		[System.Numerics.BigInteger] $shiftValue = [System.Numerics.BigInteger]::Parse($value.shiftVal)
+		[System.Numerics.BigInteger] $intBase = [System.Numerics.BigInteger]::Parse($base.integerVal)
+		if ($base.IsStrictlyNegative()) { $intValue *= -1 }
+		[System.Numerics.BigInteger] $shiftValue = [System.Numerics.BigInteger]::Parse($base.shiftVal)
 		[System.Numerics.BigInteger] $total = 1
 		[System.Numerics.BigInteger] $maxPow = 0
 
      	while ($residualExp -gt [int16]::MaxValue) {
 			if ($maxPow -eq 0) {
-				$maxPow = [System.Numerics.BigInteger]::Pow($intValue, [int16]::MaxValue);
+				$maxPow = [System.Numerics.BigInteger]::Pow($intBase, [int16]::MaxValue);
 			}
         	$residualExp -= [int16]::MaxValue
         	$total *= $maxPow
      	}
 
-     	$total *= [System.Numerics.BigInteger]::Pow($intValue, [int16]$residualExp);
-		return [BigNum]::new($total,$shiftValue*$exponent,$false,$value.maxDecimalResolution)
+     	$total *= [System.Numerics.BigInteger]::Pow($intBase, [int16]$residualExp);
+		return [BigNum]::new($total,$shiftValue*$exponent,$false,$base.maxDecimalResolution)
 	}
 
 	# PowFloat : INTERNAL USE. Returns the value of $value to the power $exponent.
-	hidden static [BigNum] PowFloat([BigNum] $value, [BigNum] $exponent) {
-		if ($value.negativeFlag) {
+	hidden static [BigNum] PowFloat([BigNum] $base, [BigNum] $exponent) {
+		if ($base.negativeFlag) {
 			throw "[BigNum]::Pow is not capable of handling complex value output"
 		}
-		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($value)))),$value.maxDecimalResolution)
+		[BigNum] $newResolution = [BigNum]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution)
+
+		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($base)))),$newResolution)
 	}
 
 	# Sqrt : Returns the value of the Square Root of $value using the Newton-Raphson algorithm.
