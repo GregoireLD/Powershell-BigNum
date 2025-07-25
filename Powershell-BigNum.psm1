@@ -467,7 +467,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# AngleMin : return a clone of the object with the smalest angle
 	static [BigComplex] AngleMin([BigComplex] $a,[BigComplex] $b) {
-		if ($a.Arg().Abs() -lt $b.Arg().Abs()) {
+		if ($a.Arg() -lt $b.Arg()) {
 			return $a.Clone()
 		}
 		return $b.Clone()
@@ -476,6 +476,22 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# AngleMax : return a clone of the object with the biggest angle
 	static [BigComplex] AngleMax([BigComplex] $a,[BigComplex] $b) {
 		if ($a.Arg() -gt $b.Arg()) {
+			return $a.Clone()
+		}
+		return $b.Clone()
+	}
+
+	# AbsAngleMin : return a clone of the object with the smalest angle
+	static [BigComplex] AbsAngleMin([BigComplex] $a,[BigComplex] $b) {
+		if ($a.PosArg() -lt $b.PosArg()) {
+			return $a.Clone()
+		}
+		return $b.Clone()
+	}
+
+	# AbsAngleMax : return a clone of the object with the biggest angle
+	static [BigComplex] AbsAngleMax([BigComplex] $a,[BigComplex] $b) {
+		if ($a.PosArg() -gt $b.PosArg()) {
 			return $a.Clone()
 		}
 		return $b.Clone()
