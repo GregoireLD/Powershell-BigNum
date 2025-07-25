@@ -14,8 +14,18 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		$this.Init($ar,$bi)
     }
 
-	# BigNum : (BigNum,BigNum) Standard Constructor for a pure real number.
+	# BigNum : (BigNum) Standard Constructor for a pure real number.
 	BigComplex([BigNum]$ar) {
+		$this.Init($ar,0)
+    }
+
+	# BigNum : (BigInteger,BigInteger) Standard Constructor for a BigInteger based complex number.
+	BigComplex([System.Numerics.BigInteger]$ar,[System.Numerics.BigInteger]$bi) {
+		$this.Init($ar,$bi)
+    }
+
+	# BigNum : (BigInteger) Standard Constructor for a pure real number using a BigInteger.
+	BigComplex([System.Numerics.BigInteger]$ar) {
 		$this.Init($ar,0)
     }
 
@@ -233,7 +243,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "Error in [BigComplex]::CloneAndReducePrecisionBy : length must be positive or null"
 		}
 		
-		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpantionLength(),$this.imaginaryPart.getDecimalExpantionLength())
+		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.getMaxDecimalResolution(),$this.imaginaryPart.getMaxDecimalResolution())
 		
 		$newLength = $newResolution - $length
 
@@ -593,6 +603,10 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $targetRes = $value.getMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 
+		if ($value -eq "-1") {
+        	return ([BigComplex]"i").CloneWithNewResolution($targetRes)
+		}
+
 		$tmpValue = $value.CloneWithNewResolution($wrkRes)
 
 		[BigNum] $tmpMagnitude = $tmpValue.Magnitude()
@@ -698,109 +712,86 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# 	return [System.Numerics.BigInteger]::ModPow($base,$exponent,$modulus)
 	# }
 
-	# # Factorial : Returns $value Factorial. Internaly calls FactorialIntMulRange.
-	# static [BigNum] Factorial([BigNum] $value) {
-	# 	if (($value -eq 1) -or ($value -eq 0)) {
-	# 		return ([BigNum]1).CloneWithNewResolution($value.maxDecimalResolution)
-	# 	}
+	# Factorial : Returns $value Factorial. Internaly calls FactorialIntMulRange.
+	static [BigComplex] Factorial([BigComplex] $z) {
+		if ($z.IsPureReal()) {
+			return [BigNum]::Gamma($z.realPart.Clone())
+		}
 
-	# 	if ($value.HasDecimals() -or $value.IsStrictlyNegative()) {
-	# 		$zp1 = ($value + 1).CloneWithNewResolution($value.maxDecimalResolution)
-	# 		return [BigNum]::Gamma($zp1).Truncate($value.maxDecimalResolution).CloneWithAdjustedResolution()
-	# 	}
+		[BigComplex]$tmpZ = $z + 1
 
-	# 	# Product 2..n (1 doesn't change)
-	# 	return ([BigNum]::new(([BigNum]::FactorialIntMulRange(2, $value.Int())),0,$false,[BigNum]::defaultMaxDecimalResolution))
-	# }
+		return [BigComplex]::Gamma($tmpZ).CloneWithNewResolution($z.getMaxDecimalResolution())
+	}
 
-	# # FactorialIntMulRange : INTERNAL USE. Compute the Factorial using the Split‑Recursive method.
-	# hidden static [System.Numerics.BigInteger] FactorialIntMulRange( [System.Numerics.BigInteger] $lo, [System.Numerics.BigInteger] $hi){
-	# 	[int] $cutoff = 64
-	# 	if ($hi -lt $lo) { return [System.Numerics.BigInteger]::One }
-	# 	if ($hi -eq $lo) { return $hi }
+	# Gamma : Compute the value of the Gamma function for z.
+	static [BigComplex] Gamma([BigComplex] $z){
+		# integers ≤ 0  →  poles
+		if ($z.IsPureReal() -and $z.IsInteger() -and $z.IsNegative()) {
+			throw "[BigComplex]::Gamma(): pole at negative or null real integer z"
+		}
 
-	# 	# Small range: loop
-	# 	if (($hi - $lo) -lt $cutoff) {
-	# 		[System.Numerics.BigInteger]$p = [System.Numerics.BigInteger]::One
-	# 		for([System.Numerics.BigInteger]$k=$lo; $k -le $hi; $k += 1){
-	# 			$p = $p * $k
-	# 		}
-	# 		return $p
-	# 	}
+		if ($z.IsPureReal()) {
+			return [BigNum]::Gamma($z.realPart.Clone())
+		}
 
-	# 	# Recursive split
-	# 	[System.Numerics.BigInteger]$mid = ($lo + $hi) / 2
-	# 	[System.Numerics.BigInteger]$left  = [BigNum]::FactorialIntMulRange($lo,  $mid)
-	# 	[System.Numerics.BigInteger]$right = [BigNum]::FactorialIntMulRange($mid+1,$hi)
-	# 	return $left * $right
-	# }
+		[System.Numerics.BigInteger] $targetRes = $z.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes+10
 
-	# # Gamma : Compute the value of the Gamma function for z.
-	# static [BigNum] Gamma( [BigNum] $z ){
-	# 	# integers ≤ 0  →  poles
-	# 	if ($z.IsInteger() -and $z.IsNegative()) {
-	# 		throw "[BigNum]::Gamma(): pole at negative or null integer z"
-	# 	}
+		$tmpValue = $z.CloneWithNewResolution($wrkRes)
 
-	# 	if ($z -le 0) {
-	# 		return [BigNum]::GammaNeg($z)
-	# 	}
+		[BigComplex] $result = [BigComplex]::GammaComplex($tmpValue)
 
-	# 	return [BigNum]::GammaPos($Z)
-	# }
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# # GammaPos : INTERNAL USE. Compute the value of the Gamma function for positive $z.
-	# hidden static [BigNum] GammaPos( [BigNum] $z ){
+	# GammaComplex : INTERNAL USE. Compute the complex value of the Gamma function for complex z.
+	hidden static [BigComplex] GammaComplex( [BigComplex] $z ){
 
-	# 	# $res = $z.maxDecimalResolution + 20
+		if ($z.IsPureReal() -and $z.IsInteger() -and $z.IsNegative()) {
+			throw "[BigComplex]::GammaComplex(): pole at negative or null real integer z"
+		}
 
-	# 	$wrkRes = (([BigNum]$z.maxDecimalResolution)*1.1).Ceiling(0).Int()+10
+		[System.Numerics.BigInteger] $targetRes = $z.getMaxDecimalResolution()
+		[BigNum] $targetResBN = [BigNum]::new($targetRes)
+		[System.Numerics.BigInteger] $wrkRes = ($targetResBN*1.1).Ceiling(0).Int()+10
 
-	# 	$targetResolution = $z.maxDecimalResolution
+		$tmpValue = $z.CloneWithNewResolution($wrkRes)
 
-	# 	if ($z.IsInteger()) {
-	# 		return [BigNum]::Factorial($z-1).Truncate($targetResolution)
-	# 	}
+		$lnG = [BigComplex]::LnGammaComplex($tmpValue.CloneWithNewResolution($wrkRes))
+		$G   = [BigComplex]::Exp($lnG)
+		return $G.Truncate($wrkRes)
+	}
 
-	# 	$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($wrkRes))
-	# 	$G   = [BigNum]::Exp($lnG)
-	# 	return $G.Truncate($targetResolution)
-	# }
+	# LnGammaComplex : INTERNAL USE. Compute the Log base e of the complex Gamma function.
+	hidden static [BigComplex] LnGammaComplex([BigComplex] $z ){
+		# if ($z.realPart -le 0) {
+		# 	throw "[BigNum]::LnGammaComplex(): z must be > 0  (use Gamma to get reflection)."
+		# }
 
-	# # LnGammaPos : INTERNAL USE. Compute the Log base e of the Gamma function.
-	# hidden static [BigNum] LnGammaPos([BigNum] $z ){
-	# 	if ($z -le 0) {
-	# 		throw "[BigNum]::LnGammaPos(): z must be > 0 (reflection not yet implemented)."
-	# 	}
-	# 	if ($z.IsInteger()) {
-	# 		throw "[BigNum]::LnGammaPos(): z must not be an integer."
-	# 	}
+		[System.Numerics.BigInteger] $wrkRes = $z.getMaxDecimalResolution() + 10
+		[System.Numerics.BigInteger] $targetResolution = $z.getMaxDecimalResolution()
+		[BigComplex] $tmpZ = $z.CloneWithNewResolution($wrkRes)
 
+		# Pick Spouge parameter a
+        [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($wrkRes)
 
-	# 	[System.Numerics.BigInteger] $wrkRes = $z.maxDecimalResolution + 10
-	# 	[System.Numerics.BigInteger] $targetResolution = $z.maxDecimalResolution
-	# 	# [System.Numerics.BigInteger] $targetRes = $z.maxDecimalResolution + 5
+		# Series S = c₀ + Σ_{k=1}^{a-1} c_k / (x-1+k)
+        [BigComplex] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$wrkRes)
+        for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
+            [BigComplex] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$wrkRes)
+            [BigComplex] $den = $tmpZ - 1 + $k
+            $S += ($ck / $den)
+        }
 
-	# 	# Pick Spouge parameter a
-    #     [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($wrkRes)
+		# Main terms
+        $term1 = ($tmpZ - 0.5) * [BigComplex]::Ln(($tmpZ + $selectedA - 1).CloneWithNewResolution($wrkRes))
+        $term2 = (-($tmpZ + $selectedA - 1)).CloneWithNewResolution($wrkRes)
+        $term3 = [BigComplex]::Ln($S.CloneWithNewResolution($wrkRes))
 
-	# 	# Series S = c₀ + Σ_{k=1}^{a-1} c_k / (x-1+k)
-    #     [BigNum] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$wrkRes)
-    #     for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
-    #         [BigNum] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$wrkRes)
-    #         [BigNum] $den  = $z - 1 + $k
-    #         $S += ($ck / $den)
-    #     }
+		$LnGammaResult = ($term1 + $term2 + $term3)
 
-	# 	# Main terms
-    #     $term1 = ($z - 0.5) * [BigNum]::Ln(($z + $selectedA - 1).CloneWithNewResolution($wrkRes))
-    #     $term2 = (-($z + $selectedA - 1)).CloneWithNewResolution($wrkRes)
-    #     $term3 = [BigNum]::Ln($S.CloneWithNewResolution($wrkRes))
-
-	# 	$LnGammaResult = ($term1 + $term2 + $term3)
-
-	# 	return $LnGammaResult.Truncate($targetResolution)
-	# }
+		return $LnGammaResult.Truncate($targetResolution)
+	}
 
 	# # GammaNeg : INTERNAL USE. Compute the value of the Gamma function for negative z.
 	# hidden static [BigNum] GammaNeg( [BigNum] $z ){
@@ -2614,7 +2605,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# LnGammaPos : INTERNAL USE. Compute the Log base e of the Gamma function.
 	hidden static [BigNum] LnGammaPos([BigNum] $z ){
 		if ($z -le 0) {
-			throw "[BigNum]::LnGammaPos(): z must be > 0 (reflection not yet implemented)."
+			throw "[BigNum]::LnGammaPos(): z must be > 0 (use Gamma to get reflection)."
 		}
 		if ($z.IsInteger()) {
 			throw "[BigNum]::LnGammaPos(): z must not be an integer."
