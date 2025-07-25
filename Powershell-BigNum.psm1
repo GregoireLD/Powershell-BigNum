@@ -41,10 +41,11 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
         $this.imaginaryPart = $bi.CloneWithNewResolution($newResolution)
     }
 
-	# extractFromString : INTERNAL USE. Initialise a BigNum instance using a String as a source.
+	# extractFromString : INTERNAL USE. Initialise a BigComplex instance using a String as a source.
 	hidden [void] extractFromString([string]$stringVal) {
 		$numberFormat = (Get-Culture).NumberFormat
 		$negChar = $numberFormat.negativeSign
+		$iChar = [char]::ConvertFromUtf32(0x1d456)
 
 		$tmpRealPart = ([BigNum]0)
 		$tmpImaginaryPart = ([BigNum]0)
@@ -52,12 +53,15 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		$mustFlipR = $false
 		$mustFlipI = $false
 
-		$tmpString = $stringVal -replace '\+',''
-		$nbPlus = $stringVal.Length - $tmpString.Length
-		$tmpString = $stringVal -replace $negChar,''
-		$nbMinus = $stringVal.Length - $tmpString.Length
-		$tmpString = $stringVal -replace 'i',''
-		$nbI = $stringVal.Length - $tmpString.Length
+		$cleanStringVal = $stringVal -replace $negChar,'-'
+		$cleanStringVal = $cleanStringVal -replace $iChar,'i'
+
+		$tmpString = $cleanStringVal -replace '\+',''
+		$nbPlus = $cleanStringVal.Length - $tmpString.Length
+		$tmpString = $cleanStringVal -replace '-',''
+		$nbMinus = $cleanStringVal.Length - $tmpString.Length
+		$tmpString = $cleanStringVal -replace 'i',''
+		$nbI = $cleanStringVal.Length - $tmpString.Length
 
 		If(($nbPlus -gt 2) -or ($nbMinus -gt 2) -or (($nbPlus+$nbMinus) -gt 2) -or ($nbI -gt 1)) {
 			throw "Malformed complex number"
@@ -65,22 +69,24 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		if($nbI -eq 0) {
 			# If we have no i-part -> only real
-			$tmpRealPart = ([BigNum]$stringVal)
+			$tmpRealPart = ([BigNum]$cleanStringVal)
 		} elseif (($nbPlus+$nbMinus) -eq 0) {
 			# If we have an i-part but no symbols -> only positive imaginary
-			$tmpImaginaryPart = ([BigNum]$stringVal)
+			$tmpImaginaryPart = ([BigNum]$cleanStringVal)
+			if(($tmpImaginaryPart.IsNull()) -and ($cleanStringVal -eq "i")) { $tmpImaginaryPart = ([BigNum]1) }
 		} elseif (($nbPlus+$nbMinus) -eq 1) {
 			# If we only have one symbole
 			# Before the symbol -> Positive real part (might be empty)
 			# After the symbol -> imaginary part, sign of the symbol (non-empty)
 			if ($nbPlus -eq 1) {
-				$tmpSplit = $stringVal.Split('+')
+				$tmpSplit = $cleanStringVal.Split('+')
 			} else {
-				$tmpSplit = $stringVal.Split($negChar)
+				$tmpSplit = $cleanStringVal.Split('-')
 				$mustFlipI = $true
 			}
 			$tmpRealPart = ([BigNum]$tmpSplit[0])
 			$tmpImaginaryPart = ([BigNum]$tmpSplit[1])
+			if(($tmpImaginaryPart.IsNull()) -and ($tmpSplit[1] -eq "i")) { $tmpImaginaryPart = ([BigNum]1) }
 
 		} else {
 			# If we have two symbole
@@ -90,10 +96,10 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			$symbolCounter = 0
 			while ($symbolCounter -lt 2) {
 				$cursor += 1
-				if(($stringVal[$cursor] -eq '+') -or ($stringVal[$cursor] -eq $negChar)){ $symbolCounter += 1 }
+				if(($cleanStringVal[$cursor] -eq '+') -or ($cleanStringVal[$cursor] -eq '-')){ $symbolCounter += 1 }
 			}
-			$tmpRealPart = ([BigNum]($stringVal.Substring(0,$cursor)))
-			$tmpImaginaryPart = ([BigNum]($stringVal.Substring($cursor)))
+			$tmpRealPart = ([BigNum]($cleanStringVal.Substring(0,$cursor)))
+			$tmpImaginaryPart = ([BigNum]($cleanStringVal.Substring($cursor)))
 		}
 
 		if ($mustFlipR) { $tmpRealPart *= -1 }
@@ -323,7 +329,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	[string] ToString([string] $format, [IFormatProvider] $provider) {
 		if ($format -ne '') { $newFormat = $format }else { $newFormat = "G" }
 		if ($null -ne $provider) { $newProvider = $provider }else { $newProvider = (Get-Culture) }
-		
+
 		$strBuilder = ''
 
 		if ($this.realPart.IsNotNull()) {
@@ -334,8 +340,11 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		}
 
 		if ($this.imaginaryPart.IsNotNull()) {
-			if ($this.imaginaryPart -ne 1) {
+			if (($this.imaginaryPart -ne 1) -and ($this.imaginaryPart -ne -1)) {
 				$strBuilder += $this.imaginaryPart.ToString($newFormat, $newProvider)
+			}
+			if ($this.imaginaryPart -eq -1) {
+				$strBuilder += '-'
 			}
 			$strBuilder += 'i'
 		}
@@ -440,39 +449,39 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	#region static Operators and Methods
 
+	# MagnitudeMin : return a clone of the object with the smalest magnitude 
+	static [BigComplex] MagnitudeMin([BigComplex] $a,[BigComplex] $b) {
+		if ($a.MagnitudeSquared() -lt $b.MagnitudeSquared()) {
+			return $a.Clone()
+		}
+		return $b.Clone()
+	}
+
+	# MagnitudeMax : return a clone of the object with the biggest magnitude 
+	static [BigComplex] MagnitudeMax([BigComplex] $a,[BigComplex] $b) {
+		if ($a.MagnitudeSquared() -gt $b.MagnitudeSquared()) {
+			return $a.Clone()
+		}
+		return $b.Clone()
+	}
+
+	# AngleMin : return a clone of the object with the smalest angle
+	static [BigComplex] AngleMin([BigComplex] $a,[BigComplex] $b) {
+		if ($a.Arg().Abs() -lt $b.Arg().Abs()) {
+			return $a.Clone()
+		}
+		return $b.Clone()
+	}
+
+	# AngleMax : return a clone of the object with the biggest angle
+	static [BigComplex] AngleMax([BigComplex] $a,[BigComplex] $b) {
+		if ($a.Arg() -gt $b.Arg()) {
+			return $a.Clone()
+		}
+		return $b.Clone()
+	}
+
 	# # ToDo
-	# # MagnitudeMin : return a clone of the object with the smalest magnitude 
-	# static [BigComplex] MagnitudeMin([BigComplex] $a,[BigComplex] $b) {
-	# 	if ($a -lt $b) {
-	# 		return $a.Clone()
-	# 	}
-	# 	return $b.Clone()
-	# }
-
-	# # MagnitudeMax : return a clone of the object with the biggest magnitude 
-	# static [BigComplex] MagnitudeMax([BigComplex] $a,[BigComplex] $b) {
-	# 	if ($a -gt $b) {
-	# 		return $a.Clone()
-	# 	}
-	# 	return $b.Clone()
-	# }
-
-	# # AngleMin : return a clone of the object with the smalest angle
-	# static [BigComplex] AngleMin([BigNum] $a,[BigNum] $b) {
-	# 	if ($a -lt $b) {
-	# 		return $a.Clone()
-	# 	}
-	# 	return $b.Clone()
-	# }
-
-	# # AngleMax : return a clone of the object with the biggest angle
-	# static [BigComplex] AngleMax([BigNum] $a,[BigNum] $b) {
-	# 	if ($a -gt $b) {
-	# 		return $a.Clone()
-	# 	}
-	# 	return $b.Clone()
-	# }
-
 	# # Ln : Returns the Natural Logarithm (Logarithme Neperien) in base e for $value.
 	# static [BigNum] Ln([BigNum] $value) {
 	# 	# Trap illegal values
@@ -522,6 +531,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return [BigComplex]::new($resultReal, $resultImag)
 	}
 
+	# # ToDo
 	# # Log : Returns the Logarithm in base $base for $value.
 	# static [BigNum] Log([BigNum] $base, [BigNum] $value) {
 	# 	if (($base -le 0) -or ($base -eq [BigNum]::new(1))) {
@@ -1158,34 +1168,11 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# }
 
 	# # Atan2: Two-Argument Inverse Tangent Function. Returns a quadrant-aware signed angle.
-	# static [BigNum] Atan2([BigNum] $y, [BigNum] $x) {
+	static [BigNum] Atan2([BigComplex] $val) {
 
-	# 	# Atan2 is defined on R x R
-
-	# 	[System.Numerics.BigInteger] $targetRes = ([BigNum]::Max($y.maxDecimalResolution, $x.maxDecimalResolution)).Int()
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
-
-	# 	[BigNum] $constZero = ([BigNum]"0").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constPi = [BigNum]::Pi($wrkRes)
-	# 	[BigNum] $constPiOverTwo = $constPi / ([BigNum]"2").CloneWithNewResolution($wrkRes)
-
-	# 	if ($x.IsNull()) {
-	# 		if ($y.IsNull()) { return $constZero.Truncate($targetRes) }
-	# 		return ($y.IsStrictlyPositive() ? $constPiOverTwo : -$constPiOverTwo).Truncate($targetRes)
-	# 	}
-
-	# 	[BigNum] $arctan = [BigNum]::Arctan(($y.CloneWithNewResolution($wrkRes) / $x.CloneWithNewResolution($wrkRes)))
-
-	# 	if ($x.IsStrictlyPositive()) {
-	# 		return $arctan.Truncate($targetRes)
-	# 	}
-	# 	elseif ($y.IsStrictlyPositive()) {
-	# 		return ($arctan + $constPi).Truncate($targetRes)
-	# 	}
-	# 	else {
-	# 		return ($arctan - $constPi).Truncate($targetRes)
-	# 	}
-	# }
+		# Atan2 is defined on C
+		return [BigNum]::Atan2($val.imaginaryPart, $val.realPart)
+	}
 
 	# # Arccsc: Inverse Cosecant Function.
 	# static [BigNum] Arccsc([BigNum] $val) {
@@ -1512,9 +1499,37 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
         return [BigNum]::Pow($this.realPart, 2) + [BigNum]::Pow($this.imaginaryPart, 2)
     }
 
-	# Arg : Return a clone containing the argument of the original BigNum.
+	# Arg : Return a BigNum containing the argument of the original BigNum in ]-Pi,Pi].
 	[BigNum] Arg() {
-        return [BigNum]::Atan2($this.imaginaryPart, $this.realPart)
+		if($this.IsNull()) {
+			throw "[BigComplex]::Arg() : not defined for z = 0"
+		}
+		$tmpAtan2 = [BigComplex]::Atan2($this)
+		# If($tmpAtan2.IsStrictlyNegative()) {
+		# 	$tmpAtan2 += [BigNum]::Tau($this.getMaxDecimalResolution())
+		# }
+		If($this.IsPureReal() -and $this.IsStrictlyNegative()) {
+		 	$tmpAtan2 = [BigNum]::Pi($this.getMaxDecimalResolution())
+		}
+        return $tmpAtan2.Clone()
+    }
+
+	# PosArg : Return a BigNum containing the argument of the original BigNum in [0,Tau[.
+	[BigNum] PosArg() {
+		if($this.IsNull()) {
+			throw "[BigComplex]::Arg() : not defined for z = 0"
+		}
+		$tmpAtan2 = [BigComplex]::Atan2($this)
+
+		If($this.IsPureReal() -and $this.realPart.IsStrictlyNegative()) {
+		 	$tmpAtan2 = [BigNum]::Pi($this.getMaxDecimalResolution())
+		}
+		
+		if ($tmpAtan2.IsStrictlyNegative()) {
+			$tmpAtan2 += [BigNum]::Tau($this.getMaxDecimalResolution())
+		}
+
+        return $tmpAtan2.Clone()
     }
 
 	# Real : Return a BigNum contaning the real part of the original value.
