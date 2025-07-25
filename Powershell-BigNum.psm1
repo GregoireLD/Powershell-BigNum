@@ -5,6 +5,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	hidden [BigNum] $realPart
 	hidden [BigNum] $imaginaryPart
+	static hidden [String] $iChar = [char]::ConvertFromUtf32(0x1d456)
 	
 	#region Constructors
 
@@ -45,7 +46,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	hidden [void] extractFromString([string]$stringVal) {
 		$numberFormat = (Get-Culture).NumberFormat
 		$negChar = $numberFormat.negativeSign
-		$iChar = [char]::ConvertFromUtf32(0x1d456)
+		$tmpiChar = [BigComplex]::iChar
 
 		$tmpRealPart = ([BigNum]0)
 		$tmpImaginaryPart = ([BigNum]0)
@@ -54,7 +55,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		$mustFlipI = $false
 
 		$cleanStringVal = $stringVal -replace $negChar,'-'
-		$cleanStringVal = $cleanStringVal -replace $iChar,'i'
+		$cleanStringVal = $cleanStringVal -replace $tmpiChar,'i'
 
 		$tmpString = $cleanStringVal -replace '\+',''
 		$nbPlus = $cleanStringVal.Length - $tmpString.Length
@@ -329,6 +330,8 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	[string] ToString([string] $format, [IFormatProvider] $provider) {
 		if ($format -ne '') { $newFormat = $format }else { $newFormat = "G" }
 		if ($null -ne $provider) { $newProvider = $provider }else { $newProvider = (Get-Culture) }
+		$tmpiChar = [BigComplex]::iChar
+
 
 		$strBuilder = ''
 
@@ -346,7 +349,8 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			if ($this.imaginaryPart -eq -1) {
 				$strBuilder += '-'
 			}
-			$strBuilder += 'i'
+			# $strBuilder += 'i'
+			$strBuilder += $tmpiChar
 		}
 
 		if($this.realPart.IsNull() -and $this.imaginaryPart.IsNull()){
@@ -497,47 +501,21 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $b.Clone()
 	}
 
-	# # ToDo
-	# # Ln : Returns the Natural Logarithm (Logarithme Neperien) in base e for $value.
-	# static [BigNum] Ln([BigNum] $value) {
-	# 	# Trap illegal values
-	# 	if ($value -le 0) {
-	# 		throw "[BigNum]::Ln() function is not defined for zero nor negative numbers"
-	# 	}
 
-	# 	$tmpResolution = $value.maxDecimalResolution + 100
-		
-	# 	[BigNum] $tmpVal = $value.CloneWithNewResolution($tmpResolution)
-	# 	[BigNum] $tmpOne = [BigNum]::new("1.0").CloneWithNewResolution($tmpResolution)
-	# 	[BigNum] $tmpQuarter = [BigNum]::new("0.25").CloneWithNewResolution($tmpResolution)
-	# 	[System.Numerics.BigInteger] $powerAdjust = [System.Numerics.BigInteger]::Parse(0);
+	# Ln : Returns the Natural Logarithm (Logarithme Neperien) in base e for $value.
+	static [BigComplex] Ln([BigComplex] $value) {
+		if ($value.IsNull()) {
+			throw "[BigComplex]::Ln() error: logarithm is not defined for value = 0"
+		}
 
-	# 	# Confine x to a sensible range
-	# 	while ($tmpVal -gt $tmpOne) {
-	# 		$tmpVal /= [BigNum]::e($tmpResolution)
-	# 		$powerAdjust += 1
-	# 	}
-	# 	while ($tmpVal -lt $tmpQuarter) {
-	# 		$tmpVal *= [BigNum]::e($tmpResolution)
-	# 		$powerAdjust -= 1
-	# 	}
-		
-	# 	# Now use the Taylor series to calculate the logarithm
-	# 	$tmpVal -= 1
-	# 	[System.Numerics.BigInteger] $TAYLOR_ITERATIONS = [BigNum]::EstimateTaylorTermsForLn($tmpVal,$tmpResolution)
-	# 	[BigNum] $tmpT = [BigNum]::new(0).CloneWithNewResolution($tmpResolution)
-	# 	[BigNum] $tmpS = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
-	# 	[BigNum] $tmpZ = $tmpVal.CloneWithNewResolution($tmpResolution)
+		[BigNum] $tmpMagnitude = $value.CloneWithNewResolution($value.getMaxDecimalResolution()*2).Magnitude()
+		[BigNum] $tmpArg = $value.CloneWithNewResolution($value.getMaxDecimalResolution()*2).Arg()
 
-	# 	for ([BigNum]$k = 1; $k -le $TAYLOR_ITERATIONS; $k += 1) {
-	# 		$tmpT += $tmpZ * $tmpS / $k
-	# 		$tmpZ *= $tmpVal
-	# 		$tmpS *= -1
-	# 	}
-		
-	# 	# Combine the result with the power_adjust value and return
-	# 	return [BigNum]::new($tmpT+$powerAdjust).Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
-	# }
+		[BigNum] $tmpRealPart = [BigNum]::Ln($tmpMagnitude)
+		[BigNum] $tmpImaginaryPart = $tmpArg
+
+		return [BigComplex]::new($tmpRealPart, $tmpImaginaryPart).CloneWithNewResolution($value.getMaxDecimalResolution())
+	}
 
 	# Exp : Returns the value of e to the power $exponent.
 	static [BigComplex] Exp([BigComplex] $exponent) {
@@ -547,25 +525,23 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return [BigComplex]::new($resultReal, $resultImag)
 	}
 
+	# Log : Returns the Logarithm in base $base for $value.
+	static [BigComplex] Log([BigComplex] $base, [BigComplex] $value) {
+		if ($base.IsNull()) {
+			throw "[BigComplex]::Log() error: logarithm is not defined for base = 0"
+		}
+
+		if ($value.IsNull()) {
+			throw "[BigComplex]::Log() error: logarithm is not defined for value = 0"
+		}
+
+		[BigComplex] $lnValue = [BigComplex]::Ln($value.CloneWithNewResolution($value.getMaxDecimalResolution()*2))
+		[BigComplex] $lnBase = [BigComplex]::Ln($base.CloneWithNewResolution($value.getMaxDecimalResolution()*2))
+
+		return ($lnValue / $lnBase).CloneWithNewResolution($value.getMaxDecimalResolution())
+	}
+
 	# # ToDo
-	# # Log : Returns the Logarithm in base $base for $value.
-	# static [BigNum] Log([BigNum] $base, [BigNum] $value) {
-	# 	if (($base -le 0) -or ($base -eq [BigNum]::new(1))) {
-	# 		throw "[BigNum]::Log() error: base must be positive and not equal to 1"
-	# 	}
-	# 	if ($value -le 0) {
-	# 		throw "[BigNum]::Log() error: logarithm is not defined for non-positive values"
-	# 	}
-
-	# 	$targetResolution = ([BigNum]::Max($value.maxDecimalResolution,$base.maxDecimalResolution)).Int()
-	# 	$tmpResolutionPlus = $targetResolution + 100
-
-	# 	[BigNum] $lnValue = [BigNum]::Ln($value.CloneWithNewResolution($tmpResolutionPlus))
-	# 	[BigNum] $lnBase = [BigNum]::Ln($base.CloneWithNewResolution($tmpResolutionPlus))
-
-	# 	return [BigNum]::new($lnValue / $lnBase).Truncate($targetResolution).CloneWithNewResolution($targetResolution)
-	# }
-
 	# # Pow : Returns the value of $value to the power $exponent. Dispaches to PowTen, PowTenPositive, PowInt, and PowFloat as needed.
 	# static [BigNum] Pow([BigNum] $value, [BigNum] $exponent) {
 	# 	if(($value -eq 10) -and $exponent.IsInteger()){
@@ -1565,27 +1541,27 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# Round : Return a clone of the original BigNum rounded to $decimals digits, using the half-up rule.
 	[BigComplex] Round([System.Numerics.BigInteger]$decimals){
-		return [BigComplex]::new($this.Round($decimals),$this.Round($decimals))
+		return [BigComplex]::new($this.realPart.Round($decimals),$this.imaginaryPart.Round($decimals))
 	}
 
 	# Ceiling : Return a clone of the original BigNum rounded to $decimals digits, using the always up rule.
 	[BigComplex] Ceiling([System.Numerics.BigInteger]$decimals){
-		return [BigComplex]::new($this.Ceiling($decimals),$this.Ceiling($decimals))
+		return [BigComplex]::new($this.realPart.Ceiling($decimals),$this.imaginaryPart.Ceiling($decimals))
 	}
 
 	# Floor : Return a clone of the original BigNum rounded to $decimals digits, using the always down rule.
 	[BigComplex] Floor([System.Numerics.BigInteger]$decimals){
-		return [BigComplex]::new($this.Floor($decimals),$this.Floor($decimals))
+		return [BigComplex]::new($this.realPart.Floor($decimals),$this.imaginaryPart.Floor($decimals))
 	}
 
 	# RoundAwayFromZero : Return a clone of the original BigNum rounded to $decimals digits, using the always Away-From-Zero rule.
 	[BigComplex] RoundAwayFromZero([System.Numerics.BigInteger]$decimals){
-		return [BigComplex]::new($this.RoundAwayFromZero($decimals),$this.RoundAwayFromZero($decimals))
+		return [BigComplex]::new($this.realPart.RoundAwayFromZero($decimals),$this.imaginaryPart.RoundAwayFromZero($decimals))
 	}
 
 	# Truncate : Return a clone of the original BigNum truncated to $decimals digits. This function doest not round, just cut.
 	[BigComplex] Truncate([System.Numerics.BigInteger]$decimals) {
-		return [BigComplex]::new($this.Truncate($decimals),$this.Truncate($decimals))
+		return [BigComplex]::new($this.realPart.Truncate($decimals),$this.imaginaryPart.Truncate($decimals))
 	}
 
 	#endregion instance Methods
