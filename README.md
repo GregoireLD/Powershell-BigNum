@@ -2,11 +2,11 @@
 
 ⚡ **High-Precision Big Number Arithmetic in PowerShell** ⚡
 
-This project provides a **`BigNum` PowerShell class** designed for advanced mathematical operations with arbitrary-precision decimal numbers.
+This project provides **`BigNum` and `BigComplex` PowerShell class** designed for advanced mathematical operations with arbitrary-precision decimal numbers.
 It includes a wide set of features: from basic arithmetic to transcendental functions, roots, and famous mathematical and physical constants.
 
 > **Why?**
-> PowerShell has no built-in arbitrary-precision decimal type — but sometimes you need more than `double` or `decimal` for scientific calculations, cryptography, or precise numerical methods.
+> PowerShell has no built-in arbitrary-precision decimal type nor complex number handling — but sometimes you need more than `double` or `decimal` for scientific calculations, cryptography, or precise numerical methods.
 
 ---
 
@@ -70,6 +70,7 @@ $a = New-BigNum 12345
 
 # DotNet-style Syntax
 $b = [BigNum]6789
+$c = [BigComplex]"42-5i"
 
 $sum = $a + $b
 $diff = $a - $b
@@ -167,8 +168,8 @@ To clear them:
 
 * Negative numbers:
 
-  * even-valued `NthRootInt()` and `Sqrt()` reject negative input.
-  * `Pow()` does not support complex results (negative base with non-integer exponent).
+  * even-valued `NthRoot()` and `Sqrt()` reject negative input. Use `[BigComplex]::NthRoot()` and `[BigComplex]::Sqrt()` for complex outputs.
+  * `Pow()` does not support complex results (negative base with non-integer exponent). Use `[BigComplex]::Pow()` for complex outputs.
 
 * Internal computations use temporarily higher precision for stability and truncate the result to match the input resolution.
 
@@ -178,7 +179,7 @@ To clear them:
 
 ## 🧪 Planned Improvements
 
-* Complex number support (Preliminary works started one the BigComplex class)
+* Complex number support (Preliminary works started on the BigComplex class)
 * Performance optimizations
 
 ---

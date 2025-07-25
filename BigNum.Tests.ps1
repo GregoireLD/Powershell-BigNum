@@ -75,14 +75,14 @@ Describe "BigNum class unit tests" {
     }
 
     Context "Roots" {
-        It "Sqrt" {
+        It "Sqrt of 15" {
             [BigNum]::Sqrt(15).CloneWithNewResolution(5).ToString() | Should -Match "^3[,.]87298"
         }
-        It "Cbrt" {
+        It "Cbrt of 15" {
             [BigNum]::Cbrt(15).CloneWithNewResolution(5).ToString() | Should -Match "^2[,.]46621"
         }
-        It "4.6th Root" {
-            [BigNum]::NthRoot(([BigNum]15).CloneWithNewResolution(5),4.6).ToString() | Should -Match "^1[,.]80165"
+        It "4.6th Root of 15" {
+            [BigNum]::NthRoot(4.6,([BigNum]15).CloneWithNewResolution(5)).ToString() | Should -Match "^1[,.]80165"
         }
     }
 

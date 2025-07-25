@@ -544,7 +544,15 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# Pow : Returns the value of $value to the power $exponent. Dispaches to BigNum Pow as needed.
 	static [BigComplex] Pow([BigComplex] $base, [BigComplex] $exponent) {
-		if($base.IsPureReal() -and $exponent.IsPureReal()){
+		if($base.IsNull()){
+			return ([BigComplex]0).CloneWithNewResolution([System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution))
+		}
+
+		if($base.IsPureReal() -and $base.IsStrictlyPositive() -and $exponent.IsPureReal()){
+			return ([BigComplex]([BigNum]::Pow($base.realPart,$exponent.realPart)))
+		}
+
+		if($base.IsPureReal() -and $base.IsPositive() -and $exponent.IsPureReal()){
 			return ([BigComplex]([BigNum]::Pow($base.realPart,$exponent.realPart)))
 		}
 
@@ -612,8 +620,12 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "[BigNum]::NthRoot() - n cannot be zero"
 		}
 
+		if($n.IsPureReal() -and $value.IsPureReal() -and $n.IsStrictlyPositive() -and ((($n.realPart)%2)-eq 1)) {
+			return [BigNum]::NthRoot($n.realPart,$value.realPart)
+		}
+
 		if($n.IsPureReal() -and $n.realPart.IsInteger()) {
-			return [BigNum]::NthRootInt($n.realPart.Int(),$value)
+			return [BigComplex]::NthRootInt($n.realPart.Int(),$value)
 		}
 
 		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($n.getMaxDecimalResolution(),$value.getMaxDecimalResolution())
@@ -2024,7 +2036,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			}
 		}
 
-		return [BigNum]::new($tmpA + $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal),$newDecimalResolution)
+		return [BigNum]::new($tmpA + $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal)).CloneWithNewResolution($newDecimalResolution)
 	}
 
 	# op_Subtraction : Standard overload for the "-" operator.
@@ -2048,7 +2060,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			}
 		}
 
-		return [BigNum]::new($tmpA - $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal),$newDecimalResolution)
+		return [BigNum]::new($tmpA - $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal)).CloneWithNewResolution($newDecimalResolution)
 	}
 
 	# op_Multiply : Standard overload for the "*" operator.
@@ -2306,10 +2318,14 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	# Pow : Returns the value of $value to the power $exponent. Dispaches to PowTen, PowTenPositive, PowInt, and PowFloat as needed.
 	static [BigNum] Pow([BigNum] $base, [BigNum] $exponent) {
+		if($base.IsNull()){
+			return ([BigNum]0).CloneWithNewResolution([System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution))
+		}
+
 		if(($base -eq 10) -and $exponent.IsInteger()){
 			return [BigNum]::PowTen($exponent.Int())
 		}
-		if($exponent.IsInteger() -and $exponent.IsInteger() -and $exponent.IsPositive()) {
+		if($exponent.IsInteger() -and $exponent.IsPositive()) {
 			return [BigNum]::PowInt($base, $exponent.Int())
 		}
 		return [BigNum]::PowFloat($base, $exponent)
@@ -2351,7 +2367,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	hidden static [BigNum] PowInt([BigNum] $base, [System.Numerics.BigInteger] $exponent) {
 		[System.Numerics.BigInteger] $residualExp = [System.Numerics.BigInteger]::Parse($exponent);
 		[System.Numerics.BigInteger] $intBase = [System.Numerics.BigInteger]::Parse($base.integerVal)
-		if ($base.IsStrictlyNegative()) { $intValue *= -1 }
+		if ($base.IsStrictlyNegative()) { $intBase *= -1 }
 		[System.Numerics.BigInteger] $shiftValue = [System.Numerics.BigInteger]::Parse($base.shiftVal)
 		[System.Numerics.BigInteger] $total = 1
 		[System.Numerics.BigInteger] $maxPow = 0
@@ -2371,11 +2387,11 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# PowFloat : INTERNAL USE. Returns the value of $value to the power $exponent.
 	hidden static [BigNum] PowFloat([BigNum] $base, [BigNum] $exponent) {
 		if ($base.negativeFlag) {
-			throw "[BigNum]::Pow is not capable of handling complex value output"
+			throw "[BigNum]::Pow is not capable of handling complex value output. Please use [BigComplex]::Pow() instead."
 		}
-		[BigNum] $newResolution = [BigNum]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution)
+		[System.Numerics.BigInteger] $newResolution = [System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution)
 
-		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($base)))),$newResolution)
+		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($base))))).CloneWithNewResolution($newResolution)
 	}
 
 	# Sqrt : Returns the value of the Square Root of $value using the Newton-Raphson algorithm.
@@ -2445,7 +2461,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		# Precompute constants
 		$constOne = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
 		# $constTwo = [BigNum]::new(2).CloneWithNewResolution($tmpResolution)
-		$epsilon = [BigNum]::PowTen(5-$tmpResolution).CloneWithNewResolution($tmpResolution)
+		$epsilon = [BigNum]::PowTen(5-$tmpResolution)
 
 		$diff = $x
 		do {
