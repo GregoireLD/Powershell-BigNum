@@ -576,128 +576,90 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $result.CloneWithNewResolution($targetRes)
 	}
 
-	# # Sqrt : Returns the value of the Square Root of $value using the Newton-Raphson algorithm.
-	# static [BigNum] Sqrt([BigNum] $value) {
-	# 	if ($value.IsStrictlyNegative()) {
-    #     	throw "[BigNum]::Sqrt() is not defined for null or negative numbers"
-	# 	}
+	# Sqrt : Returns the value of the Square Root of $value.
+	static [BigComplex] Sqrt([BigComplex] $value) {
+		if ($value.IsPureReal() -and $value.IsPositive()) {
+        	return [BigNum]::Sqrt($value.realPart)
+		}
 
-	# 	$tmpResolution = $value.maxDecimalResolution + 10
-	# 	$tmpValue = $value.CloneWithNewResolution($tmpResolution)
-	# 	$constOne = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
+		[System.Numerics.BigInteger] $targetRes = $value.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 
-	# 	# Initial guess: S / 2 or 1 if S < 1
-    # 	# [BigNum] $x = ($tmpValue -lt $constOne) ? $constOne.clone() : ($tmpValue / $constTwo)
-	# 	[BigNum] $x = ($tmpValue -lt $constOne) ? ([BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length))) : (($tmpValue.integerVal.ToString().Length%2)?([BigNum]::PowTen(($tmpValue.integerVal.ToString().Length - 1)/2)):([BigNum]::PowTen($tmpValue.integerVal.ToString().Length/2)))
-	# 	# Convergence threshold
-    # 	[BigNum] $epsilon = [BigNum]::PowTen(-$tmpResolution).CloneWithNewResolution($tmpResolution)
+		$tmpValue = $value.CloneWithNewResolution($wrkRes)
 
+		[BigNum] $tmpMagnitude = $tmpValue.Magnitude()
+		[BigNum] $tmpTheta = $tmpValue.Arg()
 
-	# 	[BigNum] $half = [BigNum]::new(0.5).CloneWithNewResolution($tmpResolution)
-    # 	[BigNum] $diff = $constOne.clone()
+		[BigNum] $sqrtMagnitude = [BigNum]::Sqrt($tmpMagnitude)
+		[BigNum] $halfTheta = $tmpTheta / ([BigNum]2)
 
-	# 	do {
-	# 		$prev_x = $x
-	# 		$x = $half * ($x + ($tmpValue / $x))
-	# 		$diff = ($x - $prev_x).Abs()
-	# 	} while ($diff -gt $epsilon)
+		[BigNum] $real = $sqrtMagnitude * [BigNum]::Cos($halfTheta)
+		[BigNum] $imag = $sqrtMagnitude * [BigNum]::Sin($halfTheta)
 
-	# 	# Return truncated to user-specified resolution
-	# 	return $x.Clone().Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
-	# }
+		[BigComplex] $result = [BigComplex]::new($real, $imag)
 
-	# # Cbrt : Returns the value of the Cubic Root of $value using the Newton-Raphson algorithm.
-	# static [BigNum] Cbrt([BigNum] $value) {
-	# 	return [BigNum]::NthRootInt($value,3)
-	# }
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# # NthRoot : Returns the value of the Nth ($n) Root of $value using the Newton-Raphson algorithm. Calls NthRootInt if faster.
-	# static [BigNum] NthRoot([BigNum] $value, [BigNum] $n) {
-	# 	if ($n -eq 0) {
-	# 		throw "[BigNum]::NthRoot() - exponent 'n' cannot be zero"
-	# 	}
+	# Cbrt : Returns the value of the Cubic Root of $value using the Newton-Raphson algorithm.
+	static [BigComplex] Cbrt([BigComplex] $value) {
+		return [BigComplex]::NthRootInt(3,$value)
+	}
 
-	# 	if($n.IsInteger()) {
-	# 		return [BigNum]::NthRootInt($value,$n.Int())
-	# 	}
+	# NthRoot : Returns the value of the Nth ($n) Root of $value. Calls NthRootInt if faster.
+	static [BigComplex] NthRoot([BigComplex] $n, [BigComplex] $value) {
+		if ($n -eq 0) {
+			throw "[BigNum]::NthRoot() - n cannot be zero"
+		}
 
-	# 	$constTwo = [BigNum]::new(2)
+		if($n.IsPureReal() -and $n.realPart.IsInteger()) {
+			return [BigNum]::NthRootInt($n.realPart.Int(),$value)
+		}
 
-	# 	if (($value -lt 0) -and ((-not $n.IsInteger()) -or (($n % $constTwo) -eq 0))) {
-	# 		throw "[BigNum]::NthRoot() - negative base with non-odd integer root leads to complex result"
-	# 	}
+		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($n.getMaxDecimalResolution(),$value.getMaxDecimalResolution())
+		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 
-	# 	$tmpResolution = $value.maxDecimalResolution + 10
-	# 	$tmpValue = $value.CloneWithNewResolution($tmpResolution)
-	# 	$x = [BigNum]::PowTen(0)
+		$tmpValue = $value.CloneWithNewResolution($wrkRes)
+		$tmpN = $n.CloneWithNewResolution($wrkRes)
 
-	# 	# Initial guess: 10 ^ (numDigits / n)
-	# 	if(($tmpValue -lt 1) -and ($tmpValue -gt -1)){
-	# 		$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).CloneWithNewResolution($tmpResolution)
-	# 	} else {
-	# 		$numDigits = [BigNum]::CloneFromObject($tmpValue.integerVal.ToString().Length)
-	# 		$approxExp = $numDigits / $n
-	# 		$x = [BigNum]::PowTen($approxExp.Round(0).Int()).CloneWithNewResolution($tmpResolution)
-	# 	}
+		$logValue = [BigComplex]::Ln($tmpValue)
+		$invN = (([BigComplex]1).CloneWithNewResolution($wrkRes)) / $tmpN
+		[BigComplex] $result = [BigComplex]::Exp($logValue * $invN)
 
-	# 	# Precompute constants
-	# 	$constOne = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
-	# 	# $constTwo = [BigNum]::new(2).CloneWithNewResolution($tmpResolution)
-	# 	$epsilon = [BigNum]::PowTen(5-$tmpResolution).CloneWithNewResolution($tmpResolution)
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# 	$diff = $x
-	# 	do {
-	# 		$xPrev = $x
-	# 		$xPowerN = [BigNum]::Pow($x, $n)
-	# 		$xPowerNminus1 = [BigNum]::Pow($x, $n - $constOne)
-	# 		$x = $x - (($xPowerN - $tmpValue) / ($n * $xPowerNminus1))
-	# 		$diff = ($x - $xPrev).Abs()
-	# 	} while ($diff -gt $epsilon)
+	# NthRootInt : INTERNAL USE. Returns the value of the Nth ($n, being an integer) Root of $value.
+	hidden static [BigComplex] NthRootInt([System.Numerics.BigInteger] $n, [BigComplex] $value) {
+		if ($n -eq 0) {
+			throw "[BigNum]::NthRootInt() - n cannot be zero"
+		}
 
-	# 	return $x.Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
-	# }
+		[System.Numerics.BigInteger] $targetRes = $value.getMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
 
-	# # NthRootInt : Returns the value of the Nth ($n, being an integer) Root of $value using the Newton-Raphson algorithm.
-	# hidden static [BigNum] NthRootInt([BigNum] $value, [System.Numerics.BigInteger] $n) {
-	# 	if ($n -eq 0) {
-	# 		throw "[BigNum]::NthRootInt() - exponent 'n' cannot be zero"
-	# 	}
+		$tmpValue = $value.CloneWithNewResolution($wrkRes)
 
-	# 	if ($value -lt 0 -and (($n % 2) -eq 0)) {
-	# 		throw "[BigNum]::NthRootInt() cannot compute even roots of negative numbers"
-	# 	}
+		if ($n -lt 0) {
+			# For negative roots: return reciprocal of positive root
+			$posRoot = [BigComplex]::NthRootInt(-$n, $tmpValue)
+			return (([BigComplex]1) / $posRoot).CloneWithNewResolution($targetRes)
+		}
 
-	# 	# Setup high resolution for internal calculations
-	# 	$tmpResolution = $value.maxDecimalResolution + 10
-	# 	$tmpValue = $value.CloneWithNewResolution($tmpResolution)
-	# 	$x = [BigNum]::PowTen(0)
+		# Convert z to polar form: z = r * e^(iθ)
+		[BigNum] $tmpMagnitude = $tmpValue.Magnitude()
+		[BigNum] $tmpArg = $tmpValue.Arg()
 
-	# 	# Initial guess: 10 ^ floor(numDigits / n)
-	# 	if(($tmpValue -lt 1) -and ($tmpValue -gt -1)){
-	# 		$x = [BigNum]::PowTen(-($tmpValue.shiftVal-1-$tmpValue.integerVal.ToString().Length)).CloneWithNewResolution($tmpResolution)
-	# 	} else {
-	# 		$numDigits = $tmpValue.integerVal.ToString().Length
-	# 		$approxExp = $numDigits / $n
-	# 		$x = [BigNum]::PowTen($approxExp).CloneWithNewResolution($tmpResolution)
-	# 	}
+		# Compute root of magnitude and divide argument by n
+		[BigNum] $rootMagnitude = [BigNum]::NthRootInt($n, $tmpMagnitude)
+		[BigNum] $angle = $tmpArg / ([BigNum]::new($n).CloneWithNewResolution($wrkRes))
 
-	# 	# Precompute constants
-	# 	$nBig = [BigNum]::new($n).CloneWithNewResolution($tmpResolution)
-	# 	$nMinusOne = $nBig - 1
-	# 	$epsilon = [BigNum]::PowTen(5-$tmpResolution).CloneWithNewResolution($tmpResolution)
+		# Reconstruct root using Euler's formula: r^(1/n) * (cos(θ/n) + i·sin(θ/n))
+		[BigNum] $tmpRealPart = $rootMagnitude * [BigNum]::Cos($angle)
+		[BigNum] $tmpImagPart = $rootMagnitude * [BigNum]::Sin($angle)
 
-	# 	# Newton-Raphson iterations
-	# 	$diff = $x
-	# 	do {
-	# 		$xPrev = $x
-	# 		$xPower = [BigNum]::Pow($x, $nMinusOne)
-	# 		$x = (($nMinusOne * $x) + ($tmpValue / $xPower)) / $nBig
-	# 		$diff = ($x - $xPrev).Abs()
-	# 	} while ($diff -gt $epsilon)
-
-	# 	# Return the value truncated to the requested resolution
-	# 	return $x.Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
-	# }
+		return [BigComplex]::new($tmpRealPart, $tmpImagPart).CloneWithNewResolution($targetRes)
+	}
 
 	# # ModPow : Returns the modular exponentiation of $base raisend to the power $exponent modulo $modulus. Calls ModPowPosInt if possible.
 	# static [BigNum] ModPow([BigNum] $base, [BigNum] $exponent, [BigNum] $modulus) {
@@ -2448,17 +2410,17 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	# Cbrt : Returns the value of the Cubic Root of $value using the Newton-Raphson algorithm.
 	static [BigNum] Cbrt([BigNum] $value) {
-		return [BigNum]::NthRootInt($value,3)
+		return [BigNum]::NthRootInt(3, $value)
 	}
 
 	# NthRoot : Returns the value of the Nth ($n) Root of $value using the Newton-Raphson algorithm. Calls NthRootInt if faster.
-	static [BigNum] NthRoot([BigNum] $value, [BigNum] $n) {
+	static [BigNum] NthRoot([BigNum] $n, [BigNum] $value) {
 		if ($n -eq 0) {
 			throw "[BigNum]::NthRoot() - exponent 'n' cannot be zero"
 		}
 
 		if($n.IsInteger()) {
-			return [BigNum]::NthRootInt($value,$n.Int())
+			return [BigNum]::NthRootInt($n.Int(), $value)
 		}
 
 		$constTwo = [BigNum]::new(2)
@@ -2498,7 +2460,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	}
 
 	# NthRootInt : Returns the value of the Nth ($n, being an integer) Root of $value using the Newton-Raphson algorithm.
-	hidden static [BigNum] NthRootInt([BigNum] $value, [System.Numerics.BigInteger] $n) {
+	hidden static [BigNum] NthRootInt([System.Numerics.BigInteger] $n, [BigNum] $value) {
 		if ($n -eq 0) {
 			throw "[BigNum]::NthRootInt() - exponent 'n' cannot be zero"
 		}
