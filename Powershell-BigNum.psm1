@@ -1,7 +1,7 @@
 
 #region Classes
 
-class BigComplex : System.IComparable, System.IEquatable[object] {
+class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[object] {
 
 	hidden [BigNum] $realPart
 	hidden [BigNum] $imaginaryPart
@@ -242,7 +242,7 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 
 	#region Standard Interface Implementations
 
-	# CompareTo : IComparable Implementation. Compares values in magnitude.
+	# CompareTo : IComparable Implementation. Compares values in magnitude signed with the real part.
 	[int] CompareTo([object] $other) {
 		# Simply perform (case-insensitive) lexical comparison on the .Kind
 		# property values.
@@ -256,9 +256,9 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 
 		# if (($this.realPart -eq $tmpOther.realPart) -and ($this.imaginaryPart -eq $tmpOther.imaginaryPart)) { return 0 }
 
-		if ($this.MagnitudeSquared() -eq $tmpOther.MagnitudeSquared()) {return 0 } # -eq
+		if (($this.MagnitudeSquared()*(($this.realPart.IsStrictlyNegative()?-1:1))) -eq ($tmpOther.MagnitudeSquared()*(($tmpOther.realPart.IsStrictlyNegative()?-1:1)))) {return 0 } # -eq
 
-		if ($this.MagnitudeSquared() -lt $tmpOther.MagnitudeSquared()) {return -1 } # -lt
+		if (($this.MagnitudeSquared()*(($this.realPart.IsStrictlyNegative()?-1:1))) -lt ($tmpOther.MagnitudeSquared()*(($tmpOther.realPart.IsStrictlyNegative()?-1:1)))) {return -1 } # -lt
 
 		return 1 # -gt
     }
@@ -296,6 +296,55 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 	# op_Inequality : Standard overload for the -ne operator. Not sure it ever gets called.
 	static [bool] op_Inequality([BigNum] $a, [BigNum] $b) {
 		return (-not $a.Equals($b))
+	}
+
+	
+	# ToString : IFormattable Implementation. Return a culture-aware default string representation of the original BigComplex.
+	[string] ToString()
+	{
+		$currCulture = (Get-Culture)
+		return $this.ToString("G", $currCulture);
+	}
+	
+	# ToString : IFormattable Implementation. Return a culture-aware format-specific string representation of the original BigComplex.
+	[string] ToString([string] $format)
+	{
+		$currCulture = (Get-Culture)
+		return $this.ToString($format, $currCulture);
+	}
+
+	# ToString : IFormattable Implementation. Return a culture-specific default string representation of the original BigComplex.
+	[string] ToString([IFormatProvider] $provider)
+	{
+		return $this.ToString("G", $provider);
+	}
+
+	# ToString : IFormattable Implementation. Return a culture-aware string representation of the original BigComplex.
+	[string] ToString([string] $format, [IFormatProvider] $provider) {
+		if ($format -ne '') { $newFormat = $format }else { $newFormat = "G" }
+		if ($null -ne $provider) { $newProvider = $provider }else { $newProvider = (Get-Culture) }
+		
+		$strBuilder = ''
+
+		if ($this.realPart.IsNotNull()) {
+			$strBuilder += $this.realPart.ToString($newFormat, $newProvider)
+			if($this.imaginaryPart.IsStrictlyPositive()) {
+				$strBuilder += '+'
+			}
+		}
+
+		if ($this.imaginaryPart.IsNotNull()) {
+			if ($this.imaginaryPart -ne 1) {
+				$strBuilder += $this.imaginaryPart.ToString($newFormat, $newProvider)
+			}
+			$strBuilder += 'i'
+		}
+
+		if($this.realPart.IsNull() -and $this.imaginaryPart.IsNull()){
+			$strBuilder += '0'
+		}
+
+		return $strBuilder
 	}
 
 	#endregion Standard Interface Implementations
@@ -1483,31 +1532,6 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 		return $this.imaginaryPart.Clone()
 	}
 
-	# ToString : Return a culture-aware string representation of the original BigNum.
-	[string] ToString() {
-		$strBuilder = ''
-
-		if ($this.realPart.IsNotNull()) {
-			$strBuilder += $this.realPart.ToString()
-			if($this.imaginaryPart.IsStrictlyPositive()) {
-				$strBuilder += '+'
-			}
-		}
-
-		if ($this.imaginaryPart.IsNotNull()) {
-			if ($this.imaginaryPart -ne 1) {
-				$strBuilder += $this.imaginaryPart.ToString()
-			}
-			$strBuilder += 'i'
-		}
-
-		if($this.realPart.IsNull() -and $this.imaginaryPart.IsNull()){
-			$strBuilder += '0'
-		}
-
-		return $strBuilder
-	}
-
 	# Round : Return a clone of the original BigNum rounded to $decimals digits, using the half-up rule.
 	[BigComplex] Round([System.Numerics.BigInteger]$decimals){
 		return [BigComplex]::new($this.Round($decimals),$this.Round($decimals))
@@ -1538,7 +1562,7 @@ class BigComplex : System.IComparable, System.IEquatable[object] {
 }
 
 
-class BigNum : System.IComparable, System.IEquatable[object] {
+class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object] {
 
 	hidden [System.Numerics.BigInteger] $integerVal
 	hidden [System.Numerics.BigInteger] $shiftVal
@@ -1971,6 +1995,75 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# op_Inequality : Standard overload for the -ne operator. Not sure it ever gets called.
 	static [bool] op_Inequality([BigNum] $a, [BigNum] $b) {
 		return (-not $a.Equals($b))
+	}
+
+	# ToString : IFormattable Implementation. Return a culture-aware default string representation of the original BigNum.
+	[string] ToString()
+	{
+		$currCulture = (Get-Culture)
+		return $this.ToString("G", $currCulture);
+	}
+	
+	# ToString : IFormattable Implementation. Return a culture-aware format-specific string representation of the original BigNum.
+	[string] ToString([string] $format)
+	{
+		$currCulture = (Get-Culture)
+		return $this.ToString($format, $currCulture);
+	}
+
+	# ToString : IFormattable Implementation. Return a culture-specific default string representation of the original BigNum.
+	[string] ToString([IFormatProvider] $provider)
+	{
+		return $this.ToString("G", $provider);
+	}
+
+	# ToString : IFormattable Implementation. Return a culture-specific, format-specific string representation of the original BigNum.
+	[string] ToString([string] $format, [IFormatProvider] $provider) {
+		if ($format -ne '') { $newFormat = $format }else { $newFormat = "G" }
+		if ($null -ne $provider) { $newProvider = $provider }else { $newProvider = (Get-Culture) }
+
+		$numberFormat = $newProvider.NumberFormat
+		$deciChar = $numberFormat.NumberDecimalSeparator
+		$negChar = $numberFormat.negativeSign
+		$currencyChar = $numberFormat.CurrencySymbol
+
+		$strBuilder = ''
+
+		$strBuilder += $this.integerVal.ToString()
+		
+		if($this.shiftVal){
+			while (($strBuilder.Length - $this.shiftVal) -le 0) {
+				$strBuilder = $strBuilder.Insert(0,'0')
+			}
+			if (($strBuilder.Length - $this.shiftVal) -eq 0) {
+				$deciChar = "0,"
+			}
+			$strBuilder = $strBuilder.Insert($strBuilder.Length - $this.shiftVal,$deciChar)
+		}
+
+		if($this.negativeFlag){
+			$strBuilder = $strBuilder.Insert(0,$negChar)
+		}
+		
+		switch ($newFormat.ToUpperInvariant())
+		{
+			"C" {$strBuilder += $currencyChar} # Display currency symbol , 2 digits rounded
+			"D" {} # Full extend
+			"E" {} # E+XXX display , 6 digits rounded
+			# "EX" {return $strBuilder} # E+XXX display , X digits rounded
+			"F" {} # Rounded at 3 digits, 3 decimal places minimum
+			# "FX" {return $strBuilder} # Rounded at X digits, X decimal places minimum
+			"G" {} # Full extend
+			"N" {}
+			"P" {}
+			"R" {}
+			"X" {throw "The X (Hex) format string is not yet supported."}
+			# "0,0.000" {return $strBuilder}
+			# "#,#.00#;(#,#.00#)" {return $strBuilder}
+			default {throw "The $format format string is not supported."}
+		}
+
+		return $strBuilder
 	}
 
 	#endregion Standard Interface Implementations
@@ -3240,33 +3333,6 @@ class BigNum : System.IComparable, System.IEquatable[object] {
 	# Abs : Return a clone containing the absolute value of the original BigNum.
 	[BigNum] Abs() {
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$false,$this.maxDecimalResolution)
-	}
-
-	# ToString : Return a culture-aware string representation of the original BigNum.
-	[string] ToString() {
-		$numberFormat = (Get-Culture).NumberFormat
-		$deciChar = $numberFormat.NumberDecimalSeparator
-		$negChar = $numberFormat.negativeSign
-
-		$strBuilder = ''
-
-		$strBuilder += $this.integerVal.ToString()
-		
-		if($this.shiftVal){
-			while (($strBuilder.Length - $this.shiftVal) -le 0) {
-				$strBuilder = $strBuilder.Insert(0,'0')
-			}
-			if (($strBuilder.Length - $this.shiftVal) -eq 0) {
-				$deciChar = "0,"
-			}
-			$strBuilder = $strBuilder.Insert($strBuilder.Length - $this.shiftVal,$deciChar)
-		}
-
-		if($this.negativeFlag){
-			$strBuilder = $strBuilder.Insert(0,$negChar)
-		}
-
-		return $strBuilder
 	}
 
 	# Round : Return a clone of the original BigNum rounded to $decimals digits, using the half-up rule.
