@@ -848,9 +848,9 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-		if($val.IsPureReal()) {
-			return ([BigComplex]::new([BigNum]::Tan($val.realPart.Clone())))
-		}
+		# if($val.IsPureReal()) {
+		# 	return ([BigComplex]::new([BigNum]::Tan($val.realPart.Clone())))
+		# }
 
 		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
@@ -878,9 +878,9 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-		if($val.IsPureReal()) {
-			return ([BigComplex]::new([BigNum]::Csc($val.realPart.Clone())))
-		}
+		# if($val.IsPureReal()) {
+		# 	return ([BigComplex]::new([BigNum]::Csc($val.realPart.Clone())))
+		# }
 
 		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
@@ -904,9 +904,9 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-		if($val.IsPureReal()) {
-			return ([BigComplex]::new([BigNum]::Sec($val.realPart.Clone())))
-		}
+		# if($val.IsPureReal()) {
+		# 	return ([BigComplex]::new([BigNum]::Sec($val.realPart.Clone())))
+		# }
 
 		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
@@ -930,9 +930,9 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-		if($val.IsPureReal()) {
-			return ([BigComplex]::new([BigNum]::Cot($val.realPart.Clone())))
-		}
+		# if($val.IsPureReal()) {
+		# 	return ([BigComplex]::new([BigNum]::Cot($val.realPart.Clone())))
+		# }
 
 		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
 
@@ -1126,239 +1126,317 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	#region static Hyperbolic Trigonometry Methods
 
-	# # Sinh: Hyperbolic Sine Function.
-	# static [BigNum] Sinh([BigNum] $val) {
+	# Sinh: Hyperbolic Sine Function.
+	static [BigComplex] Sinh([BigComplex] $val) {
 
-	# 	# Sinh is defined on R
+		# Sinh is defined on C
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $expPlus  = [BigNum]::Exp($tmpVal)
-	# 	[BigNum] $expMinus = [BigNum]::Exp(-$tmpVal)
-	# 	[BigNum] $half     = [BigNum]::new("0.5").CloneWithNewResolution($wrkRes)
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Sinh($val.realPart.Clone())))
+		# }
 
-	# 	[BigNum] $sinhVal = ($expPlus - $expMinus) * $half
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
 
-	# 	return $sinhVal.Truncate($targetRes)
-	# }
-
-	# # Cosh: Hyperbolic Cosine Function.
-	# static [BigNum] Cosh([BigNum] $val) {
-
-	# 	# Cosh is defined on R
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $expPlus  = [BigNum]::Exp($tmpVal)
-	# 	[BigNum] $expMinus = [BigNum]::Exp(-$tmpVal)
-	# 	[BigNum] $half     = [BigNum]::new("0.5").CloneWithNewResolution($wrkRes)
-
-	# 	[BigNum] $coshVal = ($expPlus + $expMinus) * $half
-
-	# 	return $coshVal.Truncate($targetRes)
-	# }
-
-	# # Tanh: Hyperbolic Tangent Function.
-	# static [BigNum] Tanh([BigNum] $val) {
-
-	# 	# Tanh is defined on R
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $num  = [BigNum]::Sinh($tmpVal)
-	# 	[BigNum] $den = [BigNum]::Cosh($tmpVal)
-	# 	[BigNum] $tanhVal = ($num / $den)
-
-	# 	return $tanhVal.Truncate($targetRes)
-	# }
-
-	# # Csch: Hyperbolic Cosecant Function.
-	# static [BigNum] Csch([BigNum] $val) {
-
-	# 	# Csch is defined on R*
-
-	# 	if ($val.IsNull()) {
-	# 		throw "Error in [BigNum]::Csch : val must not be null"
-	# 	}
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $num  = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $den = [BigNum]::Sinh($tmpVal)
-	# 	[BigNum] $cschVal = ($num / $den)
-
-	# 	return $cschVal.Truncate($targetRes)
-	# }
-
-	# # Sech: Hyperbolic Secant Function.
-	# static [BigNum] Sech([BigNum] $val) {
-
-	# 	# Sech is defined on R
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $num  = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $den = [BigNum]::Cosh($tmpVal)
-	# 	[BigNum] $sechVal = ($num / $den)
-
-	# 	return $sechVal.Truncate($targetRes)
-	# }
-
-	# # Coth: Hyperbolic Cotangent Function.
-	# static [BigNum] Coth([BigNum] $val) {
-
-	# 	# Coth is defined on R*
-
-	# 	if ($val.IsNull()) {
-	# 		throw "Error in [BigNum]::Coth : val must not be null"
-	# 	}
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $num  = [BigNum]::Cosh($tmpVal)
-	# 	[BigNum] $den = [BigNum]::Sinh($tmpVal)
-	# 	[BigNum] $cothVal = ($num / $den)
-
-	# 	return $cothVal.Truncate($targetRes)
-	# }
-
-	# # Arcsinh: Inverse Hyperbolic Sine Function.
-	# static [BigNum] Arcsinh([BigNum] $val) {
-
-	# 	# Arcsinh is defined on R
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $constOne = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-
-	# 	[BigNum] $sqrtPart  = [BigNum]::Sqrt(($tmpVal * $tmpVal) + $constOne)
-	# 	[BigNum] $arcsinhVal = [BigNum]::Ln($tmpVal + $sqrtPart)
-
-	# 	return $arcsinhVal.Truncate($targetRes)
-	# }
-
-	# # Arccosh: Inverse Hyperbolic Cosine Function.
-	# static [BigNum] Arccosh([BigNum] $val) {
-
-	# 	# Arccosh is defined on [1, +Inf[
-
-	# 	if ($val -lt 1) {
-	# 		throw "Error in [BigNum]::Arccosh : val must be equal or greater than 1"
-	# 	}
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $constOne = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-
-	# 	[BigNum] $sqrtPart  = [BigNum]::Sqrt(($tmpVal * $tmpVal) - $constOne)
-	# 	[BigNum] $arccoshVal = [BigNum]::Ln($tmpVal + $sqrtPart)
-
-	# 	return $arccoshVal.Truncate($targetRes)
-	# }
-
-	# # Arctanh: Inverse Hyperbolic Tangent Function.
-	# static [BigNum] Arctanh([BigNum] $val) {
-
-	# 	# Arctanh is defined on ]−1, 1[
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
-
-	# 	if ($absVal -ge 1) {
-	# 		throw "Error in [BigNum]::Arctanh : magnitude of val must be strictly smaller than 1"
-	# 	}
-
-	# 	[BigNum] $constOne = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constHalf = ([BigNum]"0.5").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-
-	# 	[BigNum] $arctanhVal = $constHalf * [BigNum]::Ln($($constOne + $tmpVal) / ($constOne - $tmpVal))
-
-	# 	return $arctanhVal.Truncate($targetRes)
-	# }
-
-	# # Arccsch: Inverse Hyperbolic Cosecant Function.
-	# static [BigNum] Arccsch([BigNum] $val) {
-
-	# 	# Arccsch is defined on R*
-
-	# 	if ($val.IsNull()) {
-	# 		throw "Error in [BigNum]::Arccsch : val must not be null"
-	# 	}
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $constOne = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-
-	# 	[BigNum] $invX = $constOne / $tmpVal
-	# 	[BigNum] $sqrtPart = [BigNum]::Sqrt(($invX * $invX) + $constOne)
-	# 	[BigNum] $arccschVal = [BigNum]::Ln($invX + $sqrtPart)
-
-	# 	return $arccschVal.Truncate($targetRes)
-	# }
-
-	# # Arcsech: Inverse Hyperbolic Secant Function.
-	# static [BigNum] Arcsech([BigNum] $val) {
-
-	# 	# Arcsech is defined on ]0, 1]
-
-	# 	if (($val -le 0) -or ($val -gt 1)) {
-	# 		throw "Error in [BigNum]::Arcsech : val must be greater than 0 and smaller or equal to 1"
-	# 	}
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
-
-	# 	[BigNum] $constOne = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-
-	# 	[BigNum] $invX = $constOne / $tmpVal
-	# 	[BigNum] $sqrtPart = [BigNum]::Sqrt(($invX * $invX) - $constOne)
-	# 	[BigNum] $arcsechVal = [BigNum]::Ln($invX + $sqrtPart)
-
-	# 	return $arcsechVal.Truncate($targetRes)
-	# }
-
-	# # Arccoth: Inverse Hyperbolic Cotangent Function.
-	# static [BigNum] Arccoth([BigNum] $val) {
-
-	# 	# Arccoth is defined on ]-Inf, −1] U [1, +Inf[
-
-	# 	if ($val.Abs() -le 1) {
-	# 		throw "Error in [BigNum]::Arccoth : magnitude of val must be greater than 1"
-	# 	}
+		[BigComplex] $tmpEZ = [BigComplex]::Exp($tmpZ)
+		[BigComplex] $tmpEminusZ = [BigComplex]::Exp(-$tmpZ)
 		
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		[BigComplex] $result = ($tmpEZ - $tmpEminusZ) / $constTwo
 
-	# 	[BigNum] $constOne = ([BigNum]1).CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constHalf = ([BigNum]"0.5").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# 	[BigNum] $arccothVal = $constHalf * [BigNum]::Ln($($tmpVal + $constOne) / ($tmpVal - $constOne))
+	# Cosh: Hyperbolic Cosine Function.
+	static [BigComplex] Cosh([BigComplex] $val) {
 
-	# 	return $arccothVal.Truncate($targetRes)
-	# }
+		# Cosh is defined on C
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Cosh($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $tmpEZ = [BigComplex]::Exp($tmpZ)
+		[BigComplex] $tmpEminusZ = [BigComplex]::Exp(-$tmpZ)
+		
+		[BigComplex] $result = ($tmpEZ + $tmpEminusZ) / $constTwo
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Tanh: Hyperbolic Tangent Function.
+	static [BigComplex] Tanh([BigComplex] $val) {
+
+		# Tanh is defined on C \ Cosh(z) = 0
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Tanh($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $sinhZ = [BigComplex]::Sinh($tmpZ)
+		[BigComplex] $coshZ = [BigComplex]::Cosh($tmpZ)
+
+		if($coshZ.IsNull()) {
+			throw "Tanh(z) undefined: Cosh(z) is null."
+		}
+		
+		[BigComplex] $result = ($sinhZ/$coshZ)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Csch: Hyperbolic Cosecant Function.
+	static [BigComplex] Csch([BigComplex] $val) {
+
+		# Csch is defined on C \ Sinh(z) = 0
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Csch($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $sinhZ = [BigComplex]::Sinh($tmpZ)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+
+		if($sinhZ.IsNull()) {
+			throw "Csch(z) undefined: Sinh(z) is null."
+		}
+
+		[BigComplex] $result = ($constOne/$sinhZ)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Sech: Hyperbolic Secant Function.
+	static [BigComplex] Sech([BigComplex] $val) {
+
+		# Sech is defined on C \ Cosh(z) = 0
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Sech($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $coshZ = [BigComplex]::Cosh($tmpZ)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+
+		if($coshZ.IsNull()) {
+			throw "Csch(z) undefined: Cosh(z) is null."
+		}
+
+		[BigComplex] $result = ($constOne/$coshZ)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Coth: Hyperbolic Cotangent Function.
+	static [BigComplex] Coth([BigComplex] $val) {
+
+		# Coth is defined on C \ Sinh(z) = 0
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Coth($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $sinhZ = [BigComplex]::Sinh($tmpZ)
+		[BigComplex] $coshZ = [BigComplex]::Cosh($tmpZ)
+
+		if($sinhZ.IsNull()) {
+			throw "Coth(z) undefined: Sinh(z) is null."
+		}
+		
+		[BigComplex] $result = ($coshZ/$sinhZ)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arcsinh: Inverse Hyperbolic Sine Function.
+	static [BigComplex] Arcsinh([BigComplex] $val) {
+
+		# Arcsinh is defined on C
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Arcsinh($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $tmpZ2 = [BigComplex]::Pow($tmpZ,$constTwo)
+		[BigComplex] $tmpSqrt = [BigComplex]::Sqrt($tmpZ2 + $constOne)
+		
+		[BigComplex] $result = [BigComplex]::($tmpZ + $tmpSqrt)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arccosh: Inverse Hyperbolic Cosine Function.
+	static [BigComplex] Arccosh([BigComplex] $val) {
+
+		# Arccosh is defined on C
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Arccosh($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+		
+		[BigComplex] $tmpZ2 = [BigComplex]::Pow($tmpZ, $constTwo)
+		[BigComplex] $tmpSqrt = [BigComplex]::Sqrt($tmpZ2 - $constOne)
+
+		[BigComplex] $result = [BigComplex]::Ln($tmpZ + $tmpSqrt)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arctanh: Inverse Hyperbolic Tangent Function.
+	static [BigComplex] Arctanh([BigComplex] $val) {
+
+		# Arctanh is defined on C \ [-1] U [+1]
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		if(($val -eq -1) -or ($val -eq 1)) {
+			throw "Arctanh(z) undefined for z = -1 or z = 1"
+		}
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Arctanh($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+		
+		[BigComplex] $numer = $constOne + $tmpZ
+		[BigComplex] $denom = $constOne - $tmpZ
+		[BigComplex] $frac = $numer / $denom
+
+		[BigComplex] $result = [BigComplex]::Ln($frac) / $constTwo
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arccsch: Inverse Hyperbolic Cosecant Function.
+	static [BigComplex] Arccsch([BigComplex] $val) {
+
+		# Arccsch is defined on C*
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		if($val.IsNull()) {
+			throw "Arccsch(z) undefined: z is null"
+		}
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Arccsch($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $tmpZ2 = [BigComplex]::Pow($tmpZ,$constTwo)
+		[BigComplex] $invZ = ($constOne / $tmpZ)
+		[BigComplex] $invZ2 = ($constOne / $tmpZ2)
+		[BigComplex] $sqrtTerm = [BigComplex]::Sqrt($invZ2 + $constOne)
+
+		[BigComplex] $result = [BigComplex]::Ln($invZ + $sqrtTerm)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arcsech: Inverse Hyperbolic Secant Function.
+	static [BigComplex] Arcsech([BigComplex] $val) {
+
+		# Arcsech is defined on C*
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		if($val.IsNull()) {
+			throw "Arcsech(z) undefined: z is null"
+		}
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Arcsech($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $tmpZ2 = [BigComplex]::Pow($tmpZ,$constTwo)
+		[BigComplex] $invZ = ($constOne / $tmpZ)
+		[BigComplex] $invZ2 = ($constOne / $tmpZ2)
+		[BigComplex] $sqrtTerm = [BigComplex]::Sqrt($invZ2 - $constOne)
+
+		[BigComplex] $result = [BigComplex]::Ln($invZ + $sqrtTerm)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arccoth: Inverse Hyperbolic Cotangent Function.
+	static [BigComplex] Arccoth([BigComplex] $val) {
+
+		# Arccoth is defined on C \ [-1] U [+1]
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		if(($val -eq -1) -or ($val -eq 1)) {
+			throw "Arccoth(z) undefined for z = -1 or z = 1"
+		}
+
+		# if($val.IsPureReal()) {
+		# 		return ([BigComplex]::new([BigNum]::Arccoth($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+		
+		[BigComplex] $numer = $tmpZ + $constOne
+		[BigComplex] $denom = $tmpZ - $constOne
+		[BigComplex] $frac = $numer / $denom
+
+		[BigComplex] $result = [BigComplex]::Ln($frac) / $constTwo
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
 	#endregion static Hyperbolic Trigonometry Methods
 
