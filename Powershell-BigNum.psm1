@@ -948,175 +948,177 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $result.CloneWithNewResolution($targetRes)
 	}
 
-	# # Arcsin: Inverse Sine Function.
-	# static [BigNum] Arcsin([BigNum] $val) {
+	# Arcsin: Inverse Sine Function.
+	static [BigComplex] Arcsin([BigComplex] $val) {
 
-	# 	# Arcsin is defined on [−1, 1]
+		# Arcsin is defined on C
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $absVal = $val.Abs().CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $piOver2 = [BigNum]::Pi($wrkRes) / $constTwo
+		if($val.IsPureReal() -and ($val.realPart.Abs() -le 1)) {
+				return ([BigComplex]::new([BigNum]::Arcsin($val.realPart.Clone())))
+		}
 
-	# 	if ($absVal -gt $constOne) {
-	# 		throw "Arcsin undefined for |x| > 1"
-	# 	}
+		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
+    	[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
 
-	# 	if ($absVal -eq $constOne) {
-	# 		return ($val.IsStrictlyNegative() ? -$piOver2 : $piOver2).Truncate($targetRes)
-	# 	}
+		[BigComplex] $sqrtTerm = [BigComplex]::Sqrt($constOne - $tmpZ * $tmpZ)
+		[BigComplex] $lnArg = $i * $tmpZ + $sqrtTerm
+		[BigComplex] $ln = [BigComplex]::Ln($lnArg)
+		[BigComplex] $result = -$i * $ln
 
-	# 	[BigNum] $oneMinusXSquared = $constOne - ($tmpVal * $tmpVal)
-	# 	[BigNum] $sqrtTerm = [BigNum]::Sqrt($oneMinusXSquared)
-	# 	[BigNum] $ratio = $tmpVal / $sqrtTerm
-	# 	[BigNum] $result = [BigNum]::Arctan($ratio)
-
-	# 	return $result.Truncate($targetRes)
-	# }
-
-	# # Arccos: Inverse Cosine Function.
-	# static [BigNum] Arccos([BigNum] $val) {
-
-	# 	# Arccos is defined on [−1, 1]
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
-
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-
-	# 	if ($absVal -gt $constOne) {
-	# 		throw "Arccos undefined for |x| > 1"
-	# 	}
-
-	# 	[BigNum] $piOver2 = [BigNum]::Pi($wrkRes) / ([BigNum]"2").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $arcsin = [BigNum]::Arcsin($tmpVal.CloneWithNewResolution($wrkRes))
-	# 	[BigNum] $result = $piOver2 - $arcsin
-
-	# 	return $result.Truncate($targetRes)
-	# }
-
-	# # Arctan: Inverse Tangent Function.
-	# static [BigNum] Arctan([BigNum] $val) {
-
-	# 	# Arctan is defined on R
-
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes + 10
-
-	# 	[BigNum] $absVal = $val.Abs().CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $threshold = ([BigNum]"0.9").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constMinusOne = ([BigNum]"-1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $piOver2 = [BigNum]::Pi($wrkRes) / $constTwo
-
-	# 	# For |x| > 1
-	# 	if ($absVal -gt $constOne) {
-	# 		# Reduce large x: atan(x) = pi/2 * sign(x) - atan(1/x)
-	# 		[System.Numerics.BigInteger] $wrkReccuring = $wrkRes + 10
-	# 		[BigNum] $invX = $constOne.CloneWithNewResolution($wrkReccuring) / $absVal.CloneWithNewResolution($wrkReccuring)
-	# 		[BigNum] $atanInv = [BigNum]::Arctan($invX)
-	# 		$result = $piOver2.CloneWithNewResolution($wrkReccuring) - $atanInv
-	# 		if ($tmpVal.IsStrictlyNegative()) { $result = -$result }
-	# 		return $result.Truncate($targetRes)
-	# 	}
-
-	# 	# For x near 1, with x < 1
-	# 	if ($absVal -gt $threshold) {
-	# 		[BigNum] $newX = $tmpVal / ($constOne + [BigNum]::Sqrt($constOne + [BigNum]::Pow($tmpVal,$constTwo)))
-	# 		return ($constTwo * [BigNum]::Arctan($newX)).Truncate($targetRes)
-	# 	}
-
-	# 	# Taylor series for |x| <= 1
-	# 	[BigNum] $term = $tmpVal.Clone()
-	# 	[BigNum] $sum = $tmpVal.Clone()
-	# 	[BigNum] $tmpValSquare = $tmpVal * $tmpVal
-	# 	[BigNum] $target = [BigNum]::PowTen(-$wrkRes)
-	# 	[BigNum] $currentSign = $constMinusOne
-	# 	[System.Numerics.BigInteger] $n = 1
-
-	# 	while ($term.Abs() -gt $target) {
-	# 		$n += 2
-	# 		$term = ( $term * $tmpValSquare * ($n - 2) ) / $n
-	# 		$sum += $currentSign * $term
-	# 		$currentSign = -$currentSign
-	# 	}
-
-	# 	return $sum.Truncate($targetRes)
-	# }
-
-	# # Atan2: Two-Argument Inverse Tangent Function. Returns a quadrant-aware signed angle.
-	static [BigNum] Atan2([BigComplex] $val) {
-
-		# Atan2 is defined on C
-		return [BigNum]::Atan2($val.imaginaryPart, $val.realPart)
+		return $result.CloneWithNewResolution($targetRes)
 	}
 
-	# # Arccsc: Inverse Cosecant Function.
-	# static [BigNum] Arccsc([BigNum] $val) {
+	# Arccos: Inverse Cosine Function.
+	static [BigComplex] Arccos([BigComplex] $val) {
 
-	# 	# Arccsc is defined on ]-Inf, −1] U [1, +Inf[
+		# Arccos is defined on C
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
+		if($val.IsPureReal() -and ($val.realPart.Abs() -le 1)) {
+				return ([BigComplex]::new([BigNum]::Arccos($val.realPart.Clone())))
+		}
 
-	# 	if ($absVal -lt 1) {
-	# 		throw "Error in [BigNum]::Arccsc : magnitude of val must be strictly greater than 1"
-	# 	}
+		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
+    	[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
 
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $arccscVal = [BigNum]::Arcsin($constOne / $tmpVal)
+		[BigComplex] $sqrtTerm = [BigComplex]::Sqrt($tmpZ * $tmpZ - $constOne)
+		[BigComplex] $lnArg = $tmpZ + $sqrtTerm
+		[BigComplex] $ln = [BigComplex]::Ln($lnArg)
+		[BigComplex] $result = -$i * $ln
 
-	# 	return $arccscVal.CloneWithNewResolution($targetRes)
-	# }
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# # Arcsec: Inverse Secant Function.
-	# static [BigNum] Arcsec([BigNum] $val) {
+	# Arctan: Inverse Tangent Function.
+	static [BigComplex] Arctan([BigComplex] $val) {
 
-	# 	# Arcsec is defined on ]-Inf, −1] U [1, +Inf[
+		# Arctan is defined on C
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $tmpVal = $val.CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $absVal = $tmpVal.Abs().CloneWithNewResolution($wrkRes)
+		if($val.IsPureReal()) {
+				return ([BigComplex]::new([BigNum]::Arctan($val.realPart.Clone())))
+		}
 
-	# 	if ($absVal -lt 1) {
-	# 		throw "Error in [BigNum]::Arcsec : magnitude of val must be strictly greater than 1"
-	# 	}
+		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
+    	[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+		[BigComplex] $constTwo = ([BigComplex]"2").CloneWithNewResolution($wrkRes)
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
 
-	# 	[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $arcsecVal = [BigNum]::Arccos($constOne / $tmpVal)
+		[BigComplex] $ln1 = [BigComplex]::Ln($constOne - $i * $tmpZ)
+    	[BigComplex] $ln2 = [BigComplex]::Ln($constOne + $i * $tmpZ)
 
-	# 	return $arcsecVal.CloneWithNewResolution($targetRes)
-	# }
+		[BigComplex] $result = ($i / $constTwo) * ($ln1 - $ln2)
 
-	# # Arccot: Inverse Cotangent Function.
-	# static [BigNum] Arccot([BigNum] $val) {
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
-	# 	# Arccot is defined on R x R
+	# # Atan2: Two-Argument Inverse Tangent Function. Complex phase angle function.
+	static [BigComplex] Atan2([BigComplex] $z1, [BigComplex] $z2) {
 
-	# 	[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
-	# 	[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+		# Atan2 is defined on C x C
 
-	# 	[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($wrkRes)
-	# 	[BigNum] $constPi = [BigNum]::Pi($wrkRes)
-	# 	[BigNum] $newVal = $val.CloneWithNewResolution($wrkRes)
+		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($z1.GetMaxDecimalResolution(),$z2.GetMaxDecimalResolution())
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
-	# 	[BigNum] $arccotVal = ($constPi/$constTwo) - [BigNum]::Arctan($newVal)
+		if($z1.IsPureReal() -and $z2.IsPureReal()) {
+				return ([BigComplex]::new([BigNum]::Atan2($z1.realPart.Clone(),$z2.realPart.Clone())))
+		}
 
-	# 	return $arccotVal.CloneWithNewResolution($targetRes)
-	# }
+		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
+		[BigComplex] $minusI = ([BigComplex]"-i").CloneWithNewResolution($wrkRes)
+		[BigComplex] $tmpZ1 = $z1.CloneWithNewResolution($wrkRes)
+		[BigComplex] $tmpZ2 = $z2.CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $den = $tmpZ2 + ($i * $tmpZ1)
+		[BigComplex] $num = [BigComplex]::Sqrt( ($tmpZ1*$tmpZ1) + ($tmpZ2*$tmpZ2) )
+		[BigComplex] $result = $minusI * [BigComplex]::Ln($den / $num)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arccsc: Inverse Cosecant Function.
+	static [BigComplex] Arccsc([BigComplex] $val) {
+
+		# Arccsc is defined on C*
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		if($val.IsNull()) {
+			throw "Arccsc(z) undefined: z is null"
+		}
+
+		# if($val.IsPureReal()) {
+		# 	return ([BigComplex]::new([BigNum]::Arccsc($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $invZ = $constOne / $tmpZ
+		[BigComplex] $result = [BigComplex]::Arcsin($invZ)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arcsec: Inverse Secant Function.
+	static [BigComplex] Arcsec([BigComplex] $val) {
+
+		# Arcsec is defined on C*
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		if($val.IsNull()) {
+			throw "Arcsec(z) undefined: z is null"
+		}
+
+		# if($val.IsPureReal()) {
+		# 	return ([BigComplex]::new([BigNum]::Arcsec($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $invZ = $constOne / $tmpZ
+    	[BigComplex] $result = [BigComplex]::Arccos($invZ)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
+
+	# Arccot: Inverse Cotangent Function.
+	static [BigComplex] Arccot([BigComplex] $val) {
+
+		# Arccot is defined on C*
+
+		[System.Numerics.BigInteger] $targetRes = $val.GetMaxDecimalResolution()
+		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
+
+		if($val.IsNull()) {
+			throw "Arccot(z) undefined: z is null"
+		}
+
+		# if($val.IsPureReal()) {
+		# 	return ([BigComplex]::new([BigNum]::Arccot($val.realPart.Clone())))
+		# }
+
+		[BigComplex] $tmpZ = $val.CloneWithNewResolution($wrkRes)
+		[BigComplex] $constOne = ([BigComplex]"1").CloneWithNewResolution($wrkRes)
+
+		[BigComplex] $invZ = $constOne / $tmpZ
+    	[BigComplex] $result = [BigComplex]::Arctan($invZ)
+
+		return $result.CloneWithNewResolution($targetRes)
+	}
 
 	#endregion static Trigonometry Methods
 
@@ -1389,7 +1391,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		if($this.IsNull()) {
 			throw "[BigComplex]::Arg() : not defined for z = 0"
 		}
-		$tmpAtan2 = [BigComplex]::Atan2($this)
+		$tmpAtan2 = [BigNum]::Atan2($this.imaginaryPart, $this.realPart)
 		
 		If($this.IsPureReal() -and $this.IsStrictlyNegative()) {
 		 	$tmpAtan2 = [BigNum]::Pi($this.GetMaxDecimalResolution())
@@ -1402,7 +1404,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		if($this.IsNull()) {
 			throw "[BigComplex]::Arg() : not defined for z = 0"
 		}
-		$tmpAtan2 = [BigComplex]::Atan2($this)
+		$tmpAtan2 = [BigNum]::Atan2($this.imaginaryPart, $this.realPart)
 
 		If($this.IsPureReal() -and $this.realPart.IsStrictlyNegative()) {
 		 	$tmpAtan2 = [BigNum]::Pi($this.GetMaxDecimalResolution())
@@ -2982,7 +2984,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Arccot: Inverse Cotangent Function.
 	static [BigNum] Arccot([BigNum] $val) {
 
-		# Arccot is defined on R x R
+		# Arccot is defined on R
 
 		[System.Numerics.BigInteger] $targetRes = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
