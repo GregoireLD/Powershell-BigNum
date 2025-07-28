@@ -126,8 +126,10 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# GetMaxDecimalResolution : returns the maximum allowed decimal expansion of the BigComplex.
 	[System.Numerics.BigInteger]GetMaxDecimalResolution(){
-
-		return [System.Numerics.BigInteger]::Min($this.realPart.GetMaxDecimalResolution(),$this.imaginaryPart.GetMaxDecimalResolution())
+		$newRes = [System.Numerics.BigInteger]::Max($this.realPart.GetMaxDecimalResolution(),$this.imaginaryPart.GetMaxDecimalResolution())
+		$this.realPart = $this.realPart.CloneWithNewResolution($newRes)
+		$this.imaginaryPart = $this.imaginaryPart.CloneWithNewResolution($newRes)
+		return $newRes
 	}
 
 	# getDecimalExpantionLength : returns the current decimal expansion of the BigNum.
@@ -201,11 +203,16 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return [BigComplex]::new($val)
 	}
 
-	# CloneWithNewResolution : returns a new instance of BigNum with the maximum resolution altered, Trucate if needed.
+	# CloneWithNewResolution : returns a new instance of BigNum with the maximum resolution altered, Trucated if needed.
 	[BigComplex] CloneWithNewResolution([System.Numerics.BigInteger] $newResolution) {
 		$tmpAR = $this.realPart.CloneWithNewResolution($newResolution)
 		$tmpBI = $this.imaginaryPart.CloneWithNewResolution($newResolution)
 		return [BigComplex]::new($tmpAR,$tmpBI)
+	}
+
+	# CloneAndRoundWithNewResolution : returns a new instance of BigNum with the maximum resolution altered, Rounded if needed.
+	[BigComplex] CloneAndRoundWithNewResolution([System.Numerics.BigInteger] $newResolution) {
+		return $this.Round($newResolution).CloneWithNewResolution($newResolution)
 	}
 
 	# CloneWithStandardResolution : returns a new instance of BigNum with the maximum resolution set to the default one.
@@ -417,7 +424,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger]$newResolution = [System.Numerics.BigInteger]::Max($a.GetMaxDecimalResolution(),$b.GetMaxDecimalResolution())
 
 		if($a.IsPureReal() -and $b.IsPureReal()) {
-			return ([BigComplex]($a.realPart % $b.realPart))
+			return ([BigComplex]($a.realPart % $b.realPart)).CloneAndRoundWithNewResolution($newResolution)
 		}
 
 		[BigComplex]$tmpA = $a.CloneWithNewResolution($newResolution)
@@ -428,7 +435,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex]$tmpResult = $tmpA - ($tmpB * $nearestInt)
 
-		return $tmpResult.CloneWithNewResolution($newResolution)
+		return $tmpResult.CloneAndRoundWithNewResolution($newResolution)
 	}
 
 	# # op_LeftShift : Standard overload for the "<<" operator.
@@ -531,15 +538,16 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigNum] $tmpRealPart = [BigNum]::Ln($tmpMagnitude)
 		[BigNum] $tmpImaginaryPart = $tmpArg
 
-		return [BigComplex]::new($tmpRealPart, $tmpImaginaryPart).CloneWithNewResolution($value.GetMaxDecimalResolution())
+		return [BigComplex]::new($tmpRealPart, $tmpImaginaryPart).CloneAndRoundWithNewResolution($value.GetMaxDecimalResolution())
 	}
 
 	# Exp : Returns the value of e to the power $exponent.
 	static [BigComplex] Exp([BigComplex] $exponent) {
+
 		[BigNum] $resultReal = [BigNum]::Exp($exponent.realPart) * [BigNum]::Cos($exponent.imaginaryPart)
 		[BigNum] $resultImag = [BigNum]::Exp($exponent.realPart) * [BigNum]::Sin($exponent.imaginaryPart)
 
-		return [BigComplex]::new($resultReal, $resultImag)
+		return [BigComplex]::new($resultReal, $resultImag).CloneAndRoundWithNewResolution($exponent.GetMaxDecimalResolution())
 	}
 
 	# Log : Returns the Logarithm in base $base for $value.
@@ -555,14 +563,17 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $lnValue = [BigComplex]::Ln($value.CloneWithNewResolution($value.GetMaxDecimalResolution()*2))
 		[BigComplex] $lnBase = [BigComplex]::Ln($base.CloneWithNewResolution($value.GetMaxDecimalResolution()*2))
 
-		return ($lnValue / $lnBase).CloneWithNewResolution($value.GetMaxDecimalResolution())
+		return ($lnValue / $lnBase).CloneAndRoundWithNewResolution($value.GetMaxDecimalResolution())
 	}
 
 
 	# Pow : Returns the value of $value to the power $exponent. Dispaches to BigNum Pow as needed.
 	static [BigComplex] Pow([BigComplex] $base, [BigComplex] $exponent) {
+
+		$targetRes = [System.Numerics.BigInteger]::Max($base.GetMaxDecimalResolution(),$exponent.GetMaxDecimalResolution())
+
 		if($base.IsNull()){
-			return ([BigComplex]0).CloneWithNewResolution([System.Numerics.BigInteger]::Max($base.GetMaxDecimalResolution(),$exponent.GetMaxDecimalResolution()))
+			return ([BigComplex]0).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		if($base.IsPureReal() -and $base.IsStrictlyPositive() -and $exponent.IsPureReal()){
@@ -573,7 +584,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			return ([BigComplex]([BigNum]::Pow($base.realPart,$exponent.realPart)))
 		}
 
-		return [BigComplex]::PowComplex($base, $exponent)
+		return [BigComplex]::PowComplex($base, $exponent).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# PowComplex : INTERNAL USE. Returns the value of $base to the power $exponent.
@@ -586,7 +597,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			if ($exponent.IsNull()) {
 				throw "0^0 is undefined"
 			} elseif ($exponent.IsPureReal() -and $exponent.IsStrictlyPositive()) {
-				return ([BigComplex]0).CloneWithNewResolution($targetRes)
+				return ([BigComplex]0).CloneAndRoundWithNewResolution($targetRes)
 			} else {
 				throw "Error in [BigComplex]::PowComplex : 0^x is undefined for complex or negative exponents"
 			}
@@ -598,21 +609,17 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $logBase = [BigComplex]::Ln($tmpBase)
 		[BigComplex] $exponentTimesLog = $tmpExponent * $logBase
 		[BigComplex] $result = [BigComplex]::Exp($exponentTimesLog)
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Sqrt : Returns the value of the Square Root of $value.
 	static [BigComplex] Sqrt([BigComplex] $value) {
 		if ($value.IsPureReal() -and $value.IsPositive()) {
-        	return [BigNum]::Sqrt($value.realPart)
+        	return [BigNum]::Sqrt($value.realPart).CloneAndRoundWithNewResolution($value.GetMaxDecimalResolution())
 		}
 
 		[System.Numerics.BigInteger] $targetRes = $value.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $wrkRes = $targetRes*2
-
-		if ($value -eq "-1") {
-        	return ([BigComplex]"i").CloneWithNewResolution($targetRes)
-		}
 
 		$tmpValue = $value.CloneWithNewResolution($wrkRes)
 
@@ -627,12 +634,12 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = [BigComplex]::new($real, $imag)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Cbrt : Returns the value of the Cubic Root of $value using the Newton-Raphson algorithm.
 	static [BigComplex] Cbrt([BigComplex] $value) {
-		return [BigComplex]::NthRootInt(3,$value)
+		return [BigComplex]::NthRootInt(3,$value).CloneAndRoundWithNewResolution($value.GetMaxDecimalResolution())
 	}
 
 	# NthRoot : Returns the value of the Nth ($n) Root of $value. Calls NthRootInt if faster.
@@ -642,11 +649,11 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		}
 
 		if($n.IsPureReal() -and $value.IsPureReal() -and $n.IsStrictlyPositive() -and ((($n.realPart)%2)-eq 1)) {
-			return [BigNum]::NthRoot($n.realPart,$value.realPart)
+			return [BigNum]::NthRoot($n.realPart,$value.realPart).CloneAndRoundWithNewResolution([System.Numerics.BigInteger]::Max($n.realPart.GetMaxDecimalResolution(),$value.realPart.GetMaxDecimalResolution()))
 		}
 
 		if($n.IsPureReal() -and $n.realPart.IsInteger()) {
-			return [BigComplex]::NthRootInt($n.realPart.Int(),$value)
+			return [BigComplex]::NthRootInt($n.realPart.Int(),$value).CloneAndRoundWithNewResolution($value.GetMaxDecimalResolution())
 		}
 
 		[System.Numerics.BigInteger] $targetRes = [System.Numerics.BigInteger]::Max($n.GetMaxDecimalResolution(),$value.GetMaxDecimalResolution())
@@ -659,7 +666,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		$invN = (([BigComplex]1).CloneWithNewResolution($wrkRes)) / $tmpN
 		[BigComplex] $result = [BigComplex]::Exp($logValue * $invN)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# NthRootInt : INTERNAL USE. Returns the value of the Nth ($n, being an integer) Root of $value.
@@ -676,7 +683,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		if ($n -lt 0) {
 			# For negative roots: return reciprocal of positive root
 			$posRoot = [BigComplex]::NthRootInt(-$n, $tmpValue)
-			return (([BigComplex]1) / $posRoot).CloneWithNewResolution($targetRes)
+			return (([BigComplex]1) / $posRoot).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		# Convert z to polar form: z = r * e^(iθ)
@@ -691,27 +698,28 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigNum] $tmpRealPart = $rootMagnitude * [BigNum]::Cos($angle)
 		[BigNum] $tmpImagPart = $rootMagnitude * [BigNum]::Sin($angle)
 
-		return [BigComplex]::new($tmpRealPart, $tmpImagPart).CloneWithNewResolution($targetRes)
+		return [BigComplex]::new($tmpRealPart, $tmpImagPart).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# ModPow : Returns the modular exponentiation of $base raisend to the power $exponent modulo $modulus. Calls ModPowPosInt if possible.
 	static [BigComplex] ModPow([BigComplex] $base, [BigComplex] $exponent, [BigComplex] $modulus) {
+		$targetRes = [System.Numerics.BigInteger]::Max([System.Numerics.BigInteger]::Max($base.GetMaxDecimalResolution(),$exponent.GetMaxDecimalResolution()),$modulus.GetMaxDecimalResolution())
 		if ($base.IsPureReal() -and $exponent.IsPureReal() -and $modulus.IsPureReal()) {
-			return ([BigComplex]::new([BigNum]::ModPow($base.realPart.clone(),$exponent.realPart.clone(),$modulus.realPart.clone())))
+			return ([BigComplex]::new([BigNum]::ModPow($base.realPart.clone(),$exponent.realPart.clone(),$modulus.realPart.clone()))).CloneAndRoundWithNewResolution($targetRes)
 		}
 
-		return ([BigComplex]::Pow($base,$exponent) % $modulus).Clone()
+		return ([BigComplex]::Pow($base,$exponent) % $modulus).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Factorial : Returns $value Factorial. Internaly calls FactorialIntMulRange.
 	static [BigComplex] Factorial([BigComplex] $z) {
 		if ($z.IsPureReal()) {
-			return [BigNum]::Gamma($z.realPart.Clone())
+			return [BigNum]::Gamma($z.realPart.Clone()).CloneAndRoundWithNewResolution($z.GetMaxDecimalResolution())
 		}
 
 		[BigComplex]$tmpZ = $z + 1
 
-		return [BigComplex]::Gamma($tmpZ).CloneWithNewResolution($z.GetMaxDecimalResolution())
+		return [BigComplex]::Gamma($tmpZ).CloneAndRoundWithNewResolution($z.GetMaxDecimalResolution())
 	}
 
 	# Gamma : Compute the value of the Gamma function for z.
@@ -722,7 +730,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		}
 
 		if ($z.IsPureReal()) {
-			return [BigNum]::Gamma($z.realPart.Clone())
+			return [BigNum]::Gamma($z.realPart.Clone()).CloneAndRoundWithNewResolution($z.GetMaxDecimalResolution())
 		}
 
 		[System.Numerics.BigInteger] $targetRes = $z.GetMaxDecimalResolution()
@@ -732,7 +740,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = [BigComplex]::GammaComplex($tmpValue)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# GammaComplex : INTERNAL USE. Compute the complex value of the Gamma function for complex z.
@@ -750,7 +758,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		$lnG = [BigComplex]::LnGammaComplex($tmpValue.CloneWithNewResolution($wrkRes))
 		$G   = [BigComplex]::Exp($lnG)
-		return $G.Truncate($wrkRes)
+		return $G.CloneAndRoundWithNewResolution($wrkRes)
 	}
 
 	# LnGammaComplex : INTERNAL USE. Compute the Log base e of the complex Gamma function.
@@ -781,7 +789,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		$LnGammaResult = ($term1 + $term2 + $term3)
 
-		return $LnGammaResult.Truncate($targetResolution)
+		return $LnGammaResult.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	#endregion static Operators and Methods
@@ -799,7 +807,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		if($val.IsPureReal()) {
-			return ([BigComplex]::new([BigNum]::Sin($val.realPart.Clone())))
+			return ([BigComplex]::new([BigNum]::Sin($val.realPart.Clone()))).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
@@ -813,7 +821,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		# [BigComplex] $result = (([BigComplex]::Exp(([BigComplex]"i").CloneWithNewResolution($wrkRes)*$tmpVal)) - ([BigComplex]::Exp(([BigComplex]"-i").CloneWithNewResolution($wrkRes)*$tmpVal))) /([BigComplex]"2i").CloneWithNewResolution($wrkRes)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Cos: Cosine Function.
@@ -825,7 +833,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		if($val.IsPureReal()) {
-			return ([BigComplex]::new([BigNum]::Cos($val.realPart.Clone())))
+			return ([BigComplex]::new([BigNum]::Cos($val.realPart.Clone()))).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		[BigComplex] $tmpVal = $val.CloneWithNewResolution($wrkRes)
@@ -837,7 +845,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = ($expIz + $expNegIz) / $two
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Tan: Tangent Function.
@@ -867,7 +875,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = $sinZ / $cosZ
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Csc: Cosecant Function.
@@ -893,7 +901,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = $constOne / $sinZ
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Sec: Secant Function.
@@ -919,7 +927,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = $constOne / $cosZ
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Cot: Cotangent Function.
@@ -945,7 +953,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = $constOne / $tanZ
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsin: Inverse Sine Function.
@@ -957,7 +965,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		if($val.IsPureReal() -and ($val.realPart.Abs() -le 1)) {
-				return ([BigComplex]::new([BigNum]::Arcsin($val.realPart.Clone())))
+				return ([BigComplex]::new([BigNum]::Arcsin($val.realPart.Clone()))).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
@@ -969,7 +977,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $ln = [BigComplex]::Ln($lnArg)
 		[BigComplex] $result = -$i * $ln
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccos: Inverse Cosine Function.
@@ -981,7 +989,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		if($val.IsPureReal() -and ($val.realPart.Abs() -le 1)) {
-				return ([BigComplex]::new([BigNum]::Arccos($val.realPart.Clone())))
+				return ([BigComplex]::new([BigNum]::Arccos($val.realPart.Clone()))).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
@@ -993,7 +1001,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $ln = [BigComplex]::Ln($lnArg)
 		[BigComplex] $result = -$i * $ln
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arctan: Inverse Tangent Function.
@@ -1005,7 +1013,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[System.Numerics.BigInteger] $wrkRes = $targetRes +5
 
 		if($val.IsPureReal()) {
-				return ([BigComplex]::new([BigNum]::Arctan($val.realPart.Clone())))
+				return ([BigComplex]::new([BigNum]::Arctan($val.realPart.Clone()))).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		[BigComplex] $i = ([BigComplex]"i").CloneWithNewResolution($wrkRes)
@@ -1018,7 +1026,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = ($i / $constTwo) * ($ln1 - $ln2)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# # Atan2: Two-Argument Inverse Tangent Function. Complex phase angle function.
@@ -1042,7 +1050,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $num = [BigComplex]::Sqrt( ($tmpZ1*$tmpZ1) + ($tmpZ2*$tmpZ2) )
 		[BigComplex] $result = $minusI * [BigComplex]::Ln($den / $num)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccsc: Inverse Cosecant Function.
@@ -1067,7 +1075,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $invZ = $constOne / $tmpZ
 		[BigComplex] $result = [BigComplex]::Arcsin($invZ)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsec: Inverse Secant Function.
@@ -1092,7 +1100,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $invZ = $constOne / $tmpZ
     	[BigComplex] $result = [BigComplex]::Arccos($invZ)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccot: Inverse Cotangent Function.
@@ -1117,7 +1125,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigComplex] $invZ = $constOne / $tmpZ
     	[BigComplex] $result = [BigComplex]::Arctan($invZ)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	#endregion static Trigonometry Methods
@@ -1146,7 +1154,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		
 		[BigComplex] $result = ($tmpEZ - $tmpEminusZ) / $constTwo
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Cosh: Hyperbolic Cosine Function.
@@ -1169,7 +1177,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		
 		[BigComplex] $result = ($tmpEZ + $tmpEminusZ) / $constTwo
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Tanh: Hyperbolic Tangent Function.
@@ -1194,7 +1202,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		
 		[BigComplex] $result = ($sinhZ/$coshZ)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Csch: Hyperbolic Cosecant Function.
@@ -1219,7 +1227,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = ($constOne/$sinhZ)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Sech: Hyperbolic Secant Function.
@@ -1244,7 +1252,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = ($constOne/$coshZ)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Coth: Hyperbolic Cotangent Function.
@@ -1269,7 +1277,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		
 		[BigComplex] $result = ($coshZ/$sinhZ)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsinh: Inverse Hyperbolic Sine Function.
@@ -1293,7 +1301,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		
 		[BigComplex] $result = [BigComplex]::($tmpZ + $tmpSqrt)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccosh: Inverse Hyperbolic Cosine Function.
@@ -1317,7 +1325,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = [BigComplex]::Ln($tmpZ + $tmpSqrt)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arctanh: Inverse Hyperbolic Tangent Function.
@@ -1346,7 +1354,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = [BigComplex]::Ln($frac) / $constTwo
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccsch: Inverse Hyperbolic Cosecant Function.
@@ -1376,7 +1384,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = [BigComplex]::Ln($invZ + $sqrtTerm)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsech: Inverse Hyperbolic Secant Function.
@@ -1406,7 +1414,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = [BigComplex]::Ln($invZ + $sqrtTerm)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccoth: Inverse Hyperbolic Cotangent Function.
@@ -1435,7 +1443,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[BigComplex] $result = [BigComplex]::Ln($frac) / $constTwo
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	#endregion static Hyperbolic Trigonometry Methods
@@ -1872,9 +1880,14 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return [BigNum]::new($val)
 	}
 
-	# CloneWithNewResolution : returns a new instance of BigNum with the maximum resolution altered, Trucate if needed.
+	# CloneWithNewResolution : returns a new instance of BigNum with the maximum resolution altered, Trucated if needed.
 	[BigNum] CloneWithNewResolution([System.Numerics.BigInteger] $newResolution) {
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$this.negativeFlag,$newResolution)
+	}
+
+	# CloneAndRoundWithNewResolution : returns a new instance of BigNum with the maximum resolution altered, Rounded if needed.
+	[BigNum] CloneAndRoundWithNewResolution([System.Numerics.BigInteger] $newResolution) {
+		return $this.Round($newResolution).CloneWithNewResolution($newResolution)
 	}
 
 	# CloneWithStandardResolution : returns a new instance of BigNum with the maximum resolution set to the default one.
@@ -2084,7 +2097,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			}
 		}
 
-		return [BigNum]::new($tmpA + $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal)).CloneWithNewResolution($newDecimalResolution)
+		return [BigNum]::new($tmpA + $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal)).CloneAndRoundWithNewResolution($newDecimalResolution)
 	}
 
 	# op_Subtraction : Standard overload for the "-" operator.
@@ -2108,7 +2121,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			}
 		}
 
-		return [BigNum]::new($tmpA - $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal)).CloneWithNewResolution($newDecimalResolution)
+		return [BigNum]::new($tmpA - $tmpB,[System.Numerics.BigInteger]::Max($a.shiftVal,$b.shiftVal)).CloneAndRoundWithNewResolution($newDecimalResolution)
 	}
 
 	# op_Multiply : Standard overload for the "*" operator.
@@ -2120,7 +2133,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	  	if ($a.negativeFlag) { $tmpA *= -1 }
 	  	if ($b.negativeFlag) { $tmpB *= -1 }
 
-		return [BigNum]::new($tmpA * $tmpB,$a.shiftVal + $b.shiftVal,$newDecimalResolution)
+		return [BigNum]::new($tmpA * $tmpB,$a.shiftVal + $b.shiftVal,$newDecimalResolution+10).CloneAndRoundWithNewResolution($newDecimalResolution)
 	}
 
 	# op_Division : Standard overload for the "/" operator.
@@ -2137,7 +2150,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		$tmpA *= [BigNum]::PowTenPositive($newDecimalResolution + $b.shiftVal)
 
-		return [BigNum]::new($tmpA / $tmpB,$newDecimalResolution + $a.shiftVal,$newDecimalResolution)
+		return [BigNum]::new($tmpA / $tmpB,$newDecimalResolution + $a.shiftVal,$newDecimalResolution+10).CloneAndRoundWithNewResolution($newDecimalResolution)
 	}
 
 	# op_Modulus : Standard overload for the "%" operator.
@@ -2149,7 +2162,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[System.Numerics.BigInteger]$newDecimalResolution = [System.Numerics.BigInteger]::Max($a.maxDecimalResolution,$b.maxDecimalResolution)
 		[System.Numerics.BigInteger]$tmpDiv = [BigNum]::EuclideanDiv($tmpA,$tmpB)
 		[BigNum]$tmpResult = $tmpA - ($tmpB*$([BigNum]::CloneFromObject($tmpDiv)))
-		return $tmpResult.CloneWithNewResolution($newDecimalResolution)
+		return $tmpResult.CloneAndRoundWithNewResolution($newDecimalResolution)
 	}
 
 	# op_LeftShift : Standard overload for the "<<" operator.
@@ -2303,7 +2316,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 		
 		# Combine the result with the power_adjust value and return
-		return [BigNum]::new($tmpT+$powerAdjust).Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
+		return [BigNum]::new($tmpT+$powerAdjust).CloneAndRoundWithNewResolution($value.maxDecimalResolution)
 	}
 
 	# Exp : Returns the value of e to the power $exponent.
@@ -2343,7 +2356,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$result *= $result
 		}
 
-		return $result.Clone().Truncate($exponent.maxDecimalResolution).CloneWithNewResolution($exponent.maxDecimalResolution)
+		return $result.Clone().CloneAndRoundWithNewResolution($exponent.maxDecimalResolution)
 	}
 
 	# Log : Returns the Logarithm in base $base for $value.
@@ -2361,22 +2374,25 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $lnValue = [BigNum]::Ln($value.CloneWithNewResolution($tmpResolutionPlus))
 		[BigNum] $lnBase = [BigNum]::Ln($base.CloneWithNewResolution($tmpResolutionPlus))
 
-		return [BigNum]::new($lnValue / $lnBase).Truncate($targetResolution).CloneWithNewResolution($targetResolution)
+		return [BigNum]::new($lnValue / $lnBase).CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	# Pow : Returns the value of $value to the power $exponent. Dispaches to PowTen, PowTenPositive, PowInt, and PowFloat as needed.
 	static [BigNum] Pow([BigNum] $base, [BigNum] $exponent) {
+
+		$targetRes = [System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution)
+
 		if($base.IsNull()){
-			return ([BigNum]0).CloneWithNewResolution([System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution))
+			return ([BigNum]0).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		if(($base -eq 10) -and $exponent.IsInteger()){
-			return [BigNum]::PowTen($exponent.Int())
+			return [BigNum]::PowTen($exponent.Int()).Clone()
 		}
 		if($exponent.IsInteger() -and $exponent.IsPositive()) {
-			return [BigNum]::PowInt($base, $exponent.Int())
+			return [BigNum]::PowInt($base, $exponent.Int()).CloneAndRoundWithNewResolution($targetRes)
 		}
-		return [BigNum]::PowFloat($base, $exponent)
+		return [BigNum]::PowFloat($base, $exponent).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# PowTen : INTERNAL USE. Returns the value of 10 to the power $exponent. $exponent must be an integer. Dispaches to PowTenPositive if needed.
@@ -2439,7 +2455,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 		[System.Numerics.BigInteger] $newResolution = [System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution)
 
-		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($base))))).CloneWithNewResolution($newResolution)
+		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($base))))).CloneAndRoundWithNewResolution($newResolution)
 	}
 
 	# Sqrt : Returns the value of the Square Root of $value using the Newton-Raphson algorithm.
@@ -2469,12 +2485,13 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		} while ($diff -gt $epsilon)
 
 		# Return truncated to user-specified resolution
-		return $x.Clone().Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
+		return $x.Clone().CloneAndRoundWithNewResolution($value.maxDecimalResolution)
 	}
 
 	# Cbrt : Returns the value of the Cubic Root of $value using the Newton-Raphson algorithm.
 	static [BigNum] Cbrt([BigNum] $value) {
-		return [BigNum]::NthRootInt(3, $value)
+		$targetRes = $value.maxDecimalResolution
+		return [BigNum]::NthRootInt(3, $value).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# NthRoot : Returns the value of the Nth ($n) Root of $value using the Newton-Raphson algorithm. Calls NthRootInt if faster.
@@ -2493,6 +2510,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			throw "[BigNum]::NthRoot() - negative base with non-odd integer root leads to complex result"
 		}
 
+		$targetRes = [System.Numerics.BigInteger]::Max($n.maxDecimalResolution,$value.maxDecimalResolution)
 		$tmpResolution = $value.maxDecimalResolution + 10
 		$tmpValue = $value.CloneWithNewResolution($tmpResolution)
 		$x = [BigNum]::PowTen(0)
@@ -2520,7 +2538,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$diff = ($x - $xPrev).Abs()
 		} while ($diff -gt $epsilon)
 
-		return $x.Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
+		return $x.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# NthRootInt : Returns the value of the Nth ($n, being an integer) Root of $value using the Newton-Raphson algorithm.
@@ -2534,6 +2552,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 		# Setup high resolution for internal calculations
+		$targetRes = $value.maxDecimalResolution
 		$tmpResolution = $value.maxDecimalResolution + 10
 		$tmpValue = $value.CloneWithNewResolution($tmpResolution)
 		$x = [BigNum]::PowTen(0)
@@ -2562,15 +2581,16 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		} while ($diff -gt $epsilon)
 
 		# Return the value truncated to the requested resolution
-		return $x.Truncate($value.maxDecimalResolution).CloneWithNewResolution($value.maxDecimalResolution)
+		return $x.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# ModPow : Returns the modular exponentiation of $base raisend to the power $exponent modulo $modulus. Calls ModPowPosInt if possible.
 	static [BigNum] ModPow([BigNum] $base, [BigNum] $exponent, [BigNum] $modulus) {
+		$targetRes = [System.Numerics.BigInteger]::Max([System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution),$modulus.maxDecimalResolution)
 		if ($base.IsInteger() -and $base.IsPositive() -and $exponent.IsInteger() -and $exponent.IsPositive() -and $modulus.IsInteger() -and $modulus.IsStrictlyPositive()) {
-			return ([BigNum]::CloneFromObject([BigNum]::ModPowPosInt($base.Int(),$exponent.Int(),$modulus.Int())))
+			return [BigNum]::CloneFromObject([BigNum]::ModPowPosInt($base.Int(),$exponent.Int(),$modulus.Int())).CloneAndRoundWithNewResolution($targetRes)
 		}
-		return ([BigNum]::Pow($base,$exponent) % $modulus).Clone()
+		return ([BigNum]::Pow($base,$exponent) % $modulus).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# ModPowPosInt : INTERNAL USE. Returns cryptographically-optimised modular exponentiation of $base raisend to the power $exponent modulo $modulus.
@@ -2593,16 +2613,16 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Factorial : Returns $value Factorial. Internaly calls FactorialIntMulRange.
 	static [BigNum] Factorial([BigNum] $value) {
 		if (($value -eq 1) -or ($value -eq 0)) {
-			return ([BigNum]1).CloneWithNewResolution($value.maxDecimalResolution)
+			return ([BigNum]1).CloneAndRoundWithNewResolution($value.maxDecimalResolution)
 		}
-
+		
 		if ($value.HasDecimals() -or $value.IsStrictlyNegative()) {
 			$zp1 = ($value + 1).CloneWithNewResolution($value.maxDecimalResolution)
-			return [BigNum]::Gamma($zp1).Truncate($value.maxDecimalResolution).CloneWithAdjustedResolution()
+			return [BigNum]::Gamma($zp1).CloneAndRoundWithNewResolution($value.maxDecimalResolution)
 		}
-
+		
 		# Product 2..n (1 doesn't change)
-		return ([BigNum]::new(([BigNum]::FactorialIntMulRange(2, $value.Int())),0,$false,[BigNum]::defaultMaxDecimalResolution))
+		return ([BigNum]([BigNum]::FactorialIntMulRange(2, $value.Int()))).CloneAndRoundWithNewResolution($value.maxDecimalResolution)
 	}
 
 	# FactorialIntMulRange : INTERNAL USE. Compute the Factorial using the Split‑Recursive method.
@@ -2629,34 +2649,37 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	# Gamma : Compute the value of the Gamma function for z.
 	static [BigNum] Gamma( [BigNum] $z ){
+
+		$targetRes = $z.maxDecimalResolution
+
 		# integers ≤ 0  →  poles
 		if ($z.IsInteger() -and $z.IsNegative()) {
 			throw "[BigNum]::Gamma(): pole at negative or null integer z"
 		}
-
+		
 		if ($z -le 0) {
-			return [BigNum]::GammaNeg($z)
+			return [BigNum]::GammaNeg($z).CloneAndRoundWithNewResolution($targetRes)
 		}
 
-		return [BigNum]::GammaPos($Z)
+		return [BigNum]::GammaPos($Z).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# GammaPos : INTERNAL USE. Compute the value of the Gamma function for positive $z.
 	hidden static [BigNum] GammaPos( [BigNum] $z ){
 
 		# $res = $z.maxDecimalResolution + 20
-
+		
 		$wrkRes = (([BigNum]$z.maxDecimalResolution)*1.1).Ceiling(0).Int()+10
 
 		$targetResolution = $z.maxDecimalResolution
 
 		if ($z.IsInteger()) {
-			return [BigNum]::Factorial($z-1).Truncate($targetResolution)
+			return [BigNum]::Factorial($z-1).CloneAndRoundWithNewResolution($targetResolution)
 		}
 
 		$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($wrkRes))
 		$G   = [BigNum]::Exp($lnG)
-		return $G.Truncate($targetResolution)
+		return $G.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	# LnGammaPos : INTERNAL USE. Compute the Log base e of the Gamma function.
@@ -2691,7 +2714,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		$LnGammaResult = ($term1 + $term2 + $term3)
 
-		return $LnGammaResult.Truncate($targetResolution)
+		return $LnGammaResult.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	# GammaNeg : INTERNAL USE. Compute the value of the Gamma function for negative z.
@@ -2760,7 +2783,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$sum += $term
 		}
 
-		return $sum.CloneWithNewResolution($targetRes)
+		return $sum.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Cos: Cosine Function.
@@ -2797,7 +2820,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$sum += $term
 		}
 
-		return $sum.CloneWithNewResolution($targetRes)
+		return $sum.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Tan: Tangent Function.
@@ -2820,7 +2843,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 
-		return ($sinX / $cosX).CloneWithNewResolution($targetRes)
+		return ($sinX / $cosX).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Csc: Cosecant Function.
@@ -2838,7 +2861,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			throw "Csc(x) undefined: Sin(x) is null."
 		}
 
-		return ($constOne / $sinVal).CloneWithNewResolution($targetRes)
+		return ($constOne / $sinVal).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Sec: Secant Function.
@@ -2856,7 +2879,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			throw "Sec(x) undefined: Cos(x) is null."
 		}
 
-		return ($constOne / $cosVal).CloneWithNewResolution($targetRes)
+		return ($constOne / $cosVal).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Cot: Cotangent Function.
@@ -2880,7 +2903,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			throw "Cot(x) undefined: Tan(x) is null."
 		}
 
-		return ($constOne / $tanVal).CloneWithNewResolution($targetRes)
+		return ($constOne / $tanVal).CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsin: Inverse Sine Function.
@@ -2902,7 +2925,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 		if ($absVal -eq $constOne) {
-			return ($val.IsStrictlyNegative() ? -$piOver2 : $piOver2).Truncate($targetRes)
+			return ($val.IsStrictlyNegative() ? -$piOver2 : $piOver2).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		[BigNum] $oneMinusXSquared = $constOne - ($tmpVal * $tmpVal)
@@ -2910,7 +2933,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $ratio = $tmpVal / $sqrtTerm
 		[BigNum] $result = [BigNum]::Arctan($ratio)
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccos: Inverse Cosine Function.
@@ -2933,7 +2956,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $arcsin = [BigNum]::Arcsin($tmpVal.CloneWithNewResolution($wrkRes))
 		[BigNum] $result = $piOver2 - $arcsin
 
-		return $result.CloneWithNewResolution($targetRes)
+		return $result.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arctan: Inverse Tangent Function.
@@ -2960,13 +2983,13 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			[BigNum] $atanInv = [BigNum]::Arctan($invX)
 			$result = $piOver2.CloneWithNewResolution($wrkReccuring) - $atanInv
 			if ($tmpVal.IsStrictlyNegative()) { $result = -$result }
-			return $result.Truncate($targetRes)
+			return $result.CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		# For x near 1, with x < 1
 		if ($absVal -gt $threshold) {
 			[BigNum] $newX = $tmpVal / ($constOne + [BigNum]::Sqrt($constOne + [BigNum]::Pow($tmpVal,$constTwo)))
-			return ($constTwo * [BigNum]::Arctan($newX)).Truncate($targetRes)
+			return ($constTwo * [BigNum]::Arctan($newX)).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		# Taylor series for |x| <= 1
@@ -2984,7 +3007,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$currentSign = -$currentSign
 		}
 
-		return $sum.CloneWithNewResolution($targetRes)
+		return $sum.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Atan2: Two-Argument Inverse Tangent Function. Returns a quadrant-aware signed angle.
@@ -3001,19 +3024,19 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		if ($x.IsNull()) {
 			if ($y.IsNull()) { return $constZero.CloneWithNewResolution($targetRes) }
-			return ($y.IsStrictlyPositive() ? $constPiOverTwo : -$constPiOverTwo).CloneWithNewResolution($targetRes)
+			return ($y.IsStrictlyPositive() ? $constPiOverTwo : -$constPiOverTwo).CloneAndRoundWithNewResolution($targetRes)
 		}
 
 		[BigNum] $arctan = [BigNum]::Arctan(($y.CloneWithNewResolution($wrkRes) / $x.CloneWithNewResolution($wrkRes)))
 
 		if ($x.IsStrictlyPositive()) {
-			return $arctan.CloneWithNewResolution($targetRes)
+			return $arctan.CloneAndRoundWithNewResolution($targetRes)
 		}
 		elseif ($y.IsStrictlyPositive()) {
-			return ($arctan + $constPi).CloneWithNewResolution($targetRes)
+			return ($arctan + $constPi).CloneAndRoundWithNewResolution($targetRes)
 		}
 		else {
-			return ($arctan - $constPi).CloneWithNewResolution($targetRes)
+			return ($arctan - $constPi).CloneAndRoundWithNewResolution($targetRes)
 		}
 	}
 
@@ -3035,7 +3058,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
 		[BigNum] $arccscVal = [BigNum]::Arcsin($constOne / $tmpVal)
 
-		return $arccscVal.CloneWithNewResolution($targetRes)
+		return $arccscVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsec: Inverse Secant Function.
@@ -3056,7 +3079,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $constOne = ([BigNum]"1").CloneWithNewResolution($wrkRes)
 		[BigNum] $arcsecVal = [BigNum]::Arccos($constOne / $tmpVal)
 
-		return $arcsecVal.CloneWithNewResolution($targetRes)
+		return $arcsecVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccot: Inverse Cotangent Function.
@@ -3073,7 +3096,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		[BigNum] $arccotVal = ($constPi/$constTwo) - [BigNum]::Arctan($newVal)
 
-		return $arccotVal.CloneWithNewResolution($targetRes)
+		return $arccotVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	#endregion static Trigonometry Methods
@@ -3097,7 +3120,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		[BigNum] $sinhVal = ($expPlus - $expMinus) * $half
 
-		return $sinhVal.CloneWithNewResolution($targetRes)
+		return $sinhVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Cosh: Hyperbolic Cosine Function.
@@ -3115,7 +3138,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		[BigNum] $coshVal = ($expPlus + $expMinus) * $half
 
-		return $coshVal.CloneWithNewResolution($targetRes)
+		return $coshVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Tanh: Hyperbolic Tangent Function.
@@ -3131,7 +3154,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $den = [BigNum]::Cosh($tmpVal)
 		[BigNum] $tanhVal = ($num / $den)
 
-		return $tanhVal.CloneWithNewResolution($targetRes)
+		return $tanhVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Csch: Hyperbolic Cosecant Function.
@@ -3151,7 +3174,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $den = [BigNum]::Sinh($tmpVal)
 		[BigNum] $cschVal = ($num / $den)
 
-		return $cschVal.CloneWithNewResolution($targetRes)
+		return $cschVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Sech: Hyperbolic Secant Function.
@@ -3167,7 +3190,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $den = [BigNum]::Cosh($tmpVal)
 		[BigNum] $sechVal = ($num / $den)
 
-		return $sechVal.CloneWithNewResolution($targetRes)
+		return $sechVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Coth: Hyperbolic Cotangent Function.
@@ -3187,7 +3210,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $den = [BigNum]::Sinh($tmpVal)
 		[BigNum] $cothVal = ($num / $den)
 
-		return $cothVal.CloneWithNewResolution($targetRes)
+		return $cothVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsinh: Inverse Hyperbolic Sine Function.
@@ -3204,7 +3227,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $sqrtPart  = [BigNum]::Sqrt(($tmpVal * $tmpVal) + $constOne)
 		[BigNum] $arcsinhVal = [BigNum]::Ln($tmpVal + $sqrtPart)
 
-		return $arcsinhVal.CloneWithNewResolution($targetRes)
+		return $arcsinhVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccosh: Inverse Hyperbolic Cosine Function.
@@ -3225,7 +3248,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $sqrtPart  = [BigNum]::Sqrt(($tmpVal * $tmpVal) - $constOne)
 		[BigNum] $arccoshVal = [BigNum]::Ln($tmpVal + $sqrtPart)
 
-		return $arccoshVal.CloneWithNewResolution($targetRes)
+		return $arccoshVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arctanh: Inverse Hyperbolic Tangent Function.
@@ -3248,7 +3271,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		[BigNum] $arctanhVal = $constHalf * [BigNum]::Ln($($constOne + $tmpVal) / ($constOne - $tmpVal))
 
-		return $arctanhVal.CloneWithNewResolution($targetRes)
+		return $arctanhVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccsch: Inverse Hyperbolic Cosecant Function.
@@ -3270,7 +3293,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $sqrtPart = [BigNum]::Sqrt(($invX * $invX) + $constOne)
 		[BigNum] $arccschVal = [BigNum]::Ln($invX + $sqrtPart)
 
-		return $arccschVal.CloneWithNewResolution($targetRes)
+		return $arccschVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arcsech: Inverse Hyperbolic Secant Function.
@@ -3292,7 +3315,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $sqrtPart = [BigNum]::Sqrt(($invX * $invX) - $constOne)
 		[BigNum] $arcsechVal = [BigNum]::Ln($invX + $sqrtPart)
 
-		return $arcsechVal.CloneWithNewResolution($targetRes)
+		return $arcsechVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	# Arccoth: Inverse Hyperbolic Cotangent Function.
@@ -3313,7 +3336,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		[BigNum] $arccothVal = $constHalf * [BigNum]::Ln($($tmpVal + $constOne) / ($tmpVal - $constOne))
 
-		return $arccothVal.CloneWithNewResolution($targetRes)
+		return $arccothVal.CloneAndRoundWithNewResolution($targetRes)
 	}
 
 	#endregion static Hyperbolic Trigonometry Methods
@@ -3536,12 +3559,12 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	#region Math Constants
 
-	# Pi : Return the 1000 first digits of Pi.
+	# Pi : Return the exact 1000 first digits of Pi.
 	static [BigNum] Pi() {
 		return [BigNum]::new("3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491298336733624406566430860213949463952247371907021798609437027705392171762931767523846748184676694051320005681271452635608277857713427577896091736371787214684409012249534301465495853710507922796892589235420199561121290219608640344181598136297747713099605187072113499999983729780499510597317328160963185950244594553469083026425223082533446850352619311881710100031378387528865875332083814206171776691473035982534904287554687311595628638823537875937519577818577805321712268066130019278766111959092164201989").CloneWithAdjustedResolution()
 	}
 
-	# Pi : (BigInteger) Return the $resolution first digits of Pi.
+	# Pi : (BigInteger) Return the $resolution first digits of Pi rounded.
 	static [BigNum] Pi([System.Numerics.BigInteger] $resolution) {
 		if($resolution -lt 0){
 			throw "Resolution for Pi must be a null or positive integer"
@@ -3556,14 +3579,14 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Pi().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::Pi().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedPi.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedPi.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedPi.CloneAndRoundWithNewResolution($resolution)
 		}
 
-		$tmpResolution = $resolution + 5
+		$tmpResolution = $resolution + 10
 
 		$a = [BigNum]::new(1).CloneWithNewResolution($tmpResolution)
 		$b = [BigNum]::new(1).CloneWithNewResolution($tmpResolution) / [BigNum]::Sqrt(([BigNum]2).CloneWithNewResolution($tmpResolution))
@@ -3594,8 +3617,8 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$diff = ($tmpPi - $tmpPi_old).Abs()
 		} while ($diff -gt $referenceDiff)
 
-		[BigNum]::cachedPi = [BigNum]::new([BigNum]$tmpPi).Truncate($resolution).CloneWithNewResolution($resolution)
-		[BigNum]::cachedTau = ([BigNum]::cachedPi * 2).Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedPi = [BigNum]::new([BigNum]$tmpPi).CloneAndRoundWithNewResolution($resolution)
+		[BigNum]::cachedTau = [BigNum]::new([BigNum]$tmpPi*2).CloneAndRoundWithNewResolution($resolution)
 
 		return [BigNum]::cachedPi.Clone()
 	}
@@ -3605,12 +3628,12 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	[BigNum]::cachedPi = $null
 	}
 
-	# Tau : Return the 1000 first digits of Tau (2*Pi).
+	# Tau : Return the rounded up 1000 first digits of Tau (2*Pi).
 	static [BigNum] Tau() {
-		return [BigNum]::new("6.2831853071795864769252867665590057683943387987502116419498891846156328125724179972560696506842341359642961730265646132941876892191011644634507188162569622349005682054038770422111192892458979098607639288576219513318668922569512964675735663305424038182912971338469206972209086532964267872145204982825474491740132126311763497630418419256585081834307287357851807200226610610976409330427682939038830232188661145407315191839061843722347638652235862102370961489247599254991347037715054497824558763660238982596673467248813132861720427898927904494743814043597218874055410784343525863535047693496369353388102640011362542905271216555715426855155792183472743574429368818024499068602930991707421015845593785178470840399122242580439217280688363196272595495426199210374144226999999967459560999021194634656321926371900489189106938166052850446165066893700705238623763420200062756775057731750664167628412343553382946071965069808575109374623191257277647075751875039155637155610643424536132260038557532223918184328403978").CloneWithAdjustedResolution()
+		return [BigNum]::new("6.2831853071795864769252867665590057683943387987502116419498891846156328125724179972560696506842341359642961730265646132941876892191011644634507188162569622349005682054038770422111192892458979098607639288576219513318668922569512964675735663305424038182912971338469206972209086532964267872145204982825474491740132126311763497630418419256585081834307287357851807200226610610976409330427682939038830232188661145407315191839061843722347638652235862102370961489247599254991347037715054497824558763660238982596673467248813132861720427898927904494743814043597218874055410784343525863535047693496369353388102640011362542905271216555715426855155792183472743574429368818024499068602930991707421015845593785178470840399122242580439217280688363196272595495426199210374144226999999967459560999021194634656321926371900489189106938166052850446165066893700705238623763420200062756775057731750664167628412343553382946071965069808575109374623191257277647075751875039155637155610643424536132260038557532223918184328403979").CloneWithAdjustedResolution()
 	}
 
-	# Tau : (BigInteger) Return the $resolution first digits of Tau (2*Pi).
+	# Tau : (BigInteger) Return the $resolution first digits of Tau (2*Pi) rounded.
 	static [BigNum] Tau([System.Numerics.BigInteger] $resolution) {
 		if($resolution -lt 0){
 			throw "Resolution for Tau must be a null or positive integer"
@@ -3621,11 +3644,11 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Tau().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::Tau().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedTau.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedTau.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedTau.CloneAndRoundWithNewResolution($resolution)
 		}
 
 		[BigNum]::Pi($resolution)
@@ -3638,13 +3661,13 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	[BigNum]::cachedTau = $null
 	}
 
-	# e : Return the 1000 first digits of e.
+	# e : Return the exact 1000 first digits of e.
 	static [BigNum] e() {
 		# 1000 decimal long
 		return [BigNum]::new("2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274274663919320030599218174135966290435729003342952605956307381323286279434907632338298807531952510190115738341879307021540891499348841675092447614606680822648001684774118537423454424371075390777449920695517027618386062613313845830007520449338265602976067371132007093287091274437470472306969772093101416928368190255151086574637721112523897844250569536967707854499699679468644549059879316368892300987931277361782154249992295763514822082698951936680331825288693984964651058209392398294887933203625094431173012381970684161403970198376793206832823764648042953118023287825098194558153017567173613320698112509961818815930416903515988885193458072738667385894228792284998920868058257492796104841984443634632449684875602336248270419786232090021609902353043699418491463140934317381436405462531520961836908887070167683964243781405927145635490613031072085103837505101157477041718986106873969655212671546889570350354").CloneWithAdjustedResolution()
 	}
 
-	# e : (BigInteger) Return the $resolution first digits of e.
+	# e : (BigInteger) Return the $resolution first digits of e rounded.
 	static [BigNum] e([System.Numerics.BigInteger] $resolution) {
 		if($resolution -lt 0){
 			throw "Resolution for e must be a null or positive integer"
@@ -3655,11 +3678,11 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::e().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::e().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedE.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedE.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedE.CloneAndRoundWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
@@ -3671,7 +3694,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$result += [BigNum]::new(1) / $factorial
 		}
 
-		[BigNum]::cachedE = [BigNum]::new($result).Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedE = [BigNum]::new($result).CloneAndRoundWithNewResolution($resolution)
 
 		return [BigNum]::cachedE.Clone()
 	}
@@ -3681,7 +3704,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	[BigNum]::cachedE = $null
 	}
 
-	# Phi : Return the 1000 first digits of Phi.
+	# Phi : Return the exact 1000 first digits of Phi.
 	static [BigNum] Phi() {
 		return [BigNum]::new("1.6180339887498948482045868343656381177203091798057628621354486227052604628189024497072072041893911374847540880753868917521266338622235369317931800607667263544333890865959395829056383226613199282902678806752087668925017116962070322210432162695486262963136144381497587012203408058879544547492461856953648644492410443207713449470495658467885098743394422125448770664780915884607499887124007652170575179788341662562494075890697040002812104276217711177780531531714101170466659914669798731761356006708748071013179523689427521948435305678300228785699782977834784587822891109762500302696156170025046433824377648610283831268330372429267526311653392473167111211588186385133162038400522216579128667529465490681131715993432359734949850904094762132229810172610705961164562990981629055520852479035240602017279974717534277759277862561943208275051312181562855122248093947123414517022373580577278616008688382952304592647878017889921990270776903895321968198615143780314997411069260886742962267575605231727775203536139362").CloneWithAdjustedResolution()
 	}
@@ -3697,11 +3720,11 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Phi().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::Phi().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedPhi.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedPhi.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedPhi.CloneAndRoundWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
@@ -3718,7 +3741,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $tmpPhi = ($constOne + $constSqrt5) / $constTwo
 		
 		# Store at the new resolution
-		[BigNum]::cachedPhi = $tmpPhi.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedPhi = $tmpPhi.Clone().CloneAndRoundWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedPhi.Clone()
@@ -3800,26 +3823,26 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		switch ($n) {
 			0 {
-				return [BigNum]::new(1).CloneWithNewResolution($res)
+				return [BigNum]::new(1).CloneAndRoundWithNewResolution($res)
 			}
 			1 {
 				# B1 = -1/2 in Euler–Maclaurin
 				return ([BigNum]::new(-1).CloneWithNewResolution($res) /
-						[BigNum]::new(2).CloneWithNewResolution($res)).CloneWithNewResolution($res)
+						[BigNum]::new(2).CloneWithNewResolution($res)).CloneAndRoundWithNewResolution($res)
 			}
 			default {
 				# B_{odd>1} = 0
 				if ( ($n % 2) -eq 1 ) {
-					return [BigNum]::new(0).CloneWithNewResolution($res)
+					return [BigNum]::new(0).CloneAndRoundWithNewResolution($res)
 				}
 				# even n >= 2: compute / fetch from cache
 				[BigNum]::EnsureBernoulliNumberBUpTo($n)
 				$entry = [BigNum]::cachedBernoulliNumberB[$n]
-				[BigNum] $result = ([BigNum]::new([System.Numerics.BigInteger]$entry.num).CloneWithNewResolution($res) / [BigNum]::new([System.Numerics.BigInteger]$entry.den).CloneWithNewResolution($res)).CloneWithNewResolution($res)
+				[BigNum] $result = ([BigNum]::new([System.Numerics.BigInteger]$entry.num).CloneWithNewResolution($res) / [BigNum]::new([System.Numerics.BigInteger]$entry.den).CloneWithNewResolution($res))
 			}
 		}
 
-		return $result
+		return $result.CloneAndRoundWithNewResolution($res)
 	}
 
 	# ClearCachedBernoulliNumberB : Clear the cached values of the Bernoulli Number B
@@ -3835,7 +3858,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		# H_0 = 0
 		if ($N -eq 0) {
-			return [BigNum]::new(0).CloneWithNewResolution($res)
+			return [BigNum]::new(0).CloneAndRoundWithNewResolution($res)
 		}
 
 		$resolution = $res +5
@@ -3892,7 +3915,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 		# Final compensated result
 		$sum += $csum
-		return $sum.Truncate($res).CloneWithNewResolution($res)
+		return $sum.CloneAndRoundWithNewResolution($res)
 	}
 
 	# SpougeCoefficient: Spouge Coefficient generator
@@ -3914,7 +3937,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		$ConstSqrt2Pi = ([BigNum]::Sqrt([BigNum]::Tau($wrkRes+5)))
 
 		if ($k -eq 0) {
-			return $ConstSqrt2Pi
+			return $ConstSqrt2Pi.CloneAndRoundWithNewResolution($resolution)
 			# return (([BigNum]::new(1).CloneWithNewResolution($resolution) / $ConstSqrt2Pi).Truncate($resolution))
 			# return (([BigNum]::new(1).CloneWithNewResolution($resolution)).Truncate($resolution))
 		}
@@ -3929,7 +3952,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
         $ck = ($sign * $powPart * $expPart) / $fact
 
-		return $ck.Truncate($resolution)
+		return $ck.CloneAndRoundWithNewResolution($resolution)
 	}
 
 	# ReciprocalPow : INTERNAL USE. Returns the value of 1/N^p at $res resolution.
@@ -3937,10 +3960,10 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		# compute 1/N^p at working resolution
 		$tmp = [BigNum]::new([System.Numerics.BigInteger]$N).CloneWithNewResolution($res)
 		$tmpPow = [BigNum]::PowInt($tmp,$p)
-		return ([BigNum]::new(1).CloneWithNewResolution($res) / $tmpPow).CloneWithNewResolution($res)
+		return ([BigNum]::new(1).CloneWithNewResolution($res) / $tmpPow).CloneAndRoundWithNewResolution($res)
 	}
 
-	# EulerMascheroniGamma : Return the 1000 first digits of the Euler-Mascheroni Gamma constant.
+	# EulerMascheroniGamma : Return the exact 1000 first digits of the Euler-Mascheroni Gamma constant.
 	static [BigNum] EulerMascheroniGamma() {
 		return [BigNum]::new("0.5772156649015328606065120900824024310421593359399235988057672348848677267776646709369470632917467495146314472498070824809605040144865428362241739976449235362535003337429373377376739427925952582470949160087352039481656708532331517766115286211995015079847937450857057400299213547861466940296043254215190587755352673313992540129674205137541395491116851028079842348775872050384310939973613725530608893312676001724795378367592713515772261027349291394079843010341777177808815495706610750101619166334015227893586796549725203621287922655595366962817638879272680132431010476505963703947394957638906572967929601009015125195950922243501409349871228247949747195646976318506676129063811051824197444867836380861749455169892792301877391072945781554316005002182844096053772434203285478367015177394398700302370339518328690001558193988042707411542227819716523011073565833967348717650491941812300040654693142999297779569303100503086303418569803231083691640025892970890985486825777364288253954925873629596133298574739302").CloneWithAdjustedResolution()
 	}
@@ -3958,11 +3981,11 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[bool]$testAlwaysCompute = $false   # set $true when you want to force algorithm test
 		if (-not $testAlwaysCompute) {
 			if ($resolution -le 1000) {
-				return [BigNum]::EulerMascheroniGamma().Truncate($resolution).CloneWithNewResolution($resolution)
+				return [BigNum]::EulerMascheroniGamma().CloneAndRoundWithNewResolution($resolution)
 			}
 
 			if ($resolution -le [BigNum]::cachedEulerMascheroniGamma.GetMaxDecimalResolution()) {
-				return [BigNum]::cachedEulerMascheroniGamma.Truncate($resolution).CloneWithNewResolution($resolution)
+				return [BigNum]::cachedEulerMascheroniGamma.CloneAndRoundWithNewResolution($resolution)
 			}
 		}
 
@@ -4028,7 +4051,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 		# Store at the new resolution
-		[BigNum]::cachedEulerMascheroniGamma = $gamma.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedEulerMascheroniGamma = $gamma.Clone().CloneAndRoundWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedEulerMascheroniGamma.Clone()
@@ -4075,18 +4098,18 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Sqrt2().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::Sqrt2().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedSqrt2.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedSqrt2.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedSqrt2.CloneAndRoundWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
 		[BigNum] $tmpSqrt2 = [BigNum]::Sqrt(([BigNum]2).CloneWithNewResolution($tmpResolution))
 		
 		# Store at the new resolution
-		[BigNum]::cachedSqrt2 = $tmpSqrt2.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedSqrt2 = $tmpSqrt2.CloneAndRoundWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedSqrt2.Clone()
@@ -4113,18 +4136,18 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Sqrt3().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::Sqrt3().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedSqrt3.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedSqrt3.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedSqrt3.CloneAndRoundWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
 		[BigNum] $tmpSqrt3 = [BigNum]::Sqrt(([BigNum]3).CloneWithNewResolution($tmpResolution))
 
 		# Store at the new resolution
-		[BigNum]::cachedSqrt3 = $tmpSqrt3.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedSqrt3 = $tmpSqrt3.CloneAndRoundWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedSqrt3.Clone()
@@ -4151,18 +4174,18 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Cbrt2().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::Cbrt2().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedCbrt2.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedCbrt2.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedCbrt2.CloneAndRoundWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
 		[BigNum] $tmpCbrt2 = [BigNum]::Cbrt(([BigNum]2).CloneWithNewResolution($tmpResolution))
 		
 		# Store at the new resolution
-		[BigNum]::cachedCbrt2 = $tmpCbrt2.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedCbrt2 = $tmpCbrt2.CloneAndRoundWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedCbrt2.Clone()
@@ -4189,18 +4212,18 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 
 		if ($resolution -le 1000) {
-			return [BigNum]::Cbrt3().Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::Cbrt3().CloneAndRoundWithNewResolution($resolution)
 		}
 
 		if ($resolution -le [BigNum]::cachedCbrt3.GetMaxDecimalResolution()) {
-			return [BigNum]::cachedCbrt3.Truncate($resolution).CloneWithNewResolution($resolution)
+			return [BigNum]::cachedCbrt3.CloneAndRoundWithNewResolution($resolution)
 		}
 
 		$tmpResolution = $resolution + 100
 		[BigNum] $tmpCbrt3 = [BigNum]::Cbrt(([BigNum]3).CloneWithNewResolution($tmpResolution))
 		
 		# Store at the new resolution
-		[BigNum]::cachedCbrt3 = $tmpCbrt3.Clone().Truncate($resolution).CloneWithNewResolution($resolution)
+		[BigNum]::cachedCbrt3 = $tmpCbrt3.CloneAndRoundWithNewResolution($resolution)
 
 		# Return the new value
 		return [BigNum]::cachedCbrt3.Clone()
