@@ -67,10 +67,11 @@ Import-Module <Path_to_the_Powershell-BigNum.psm1_file>
 ```powershell
 # PowerShell-style Syntax
 $a = New-BigNum 12345
+$c = New-BigComplex "42-7.5i"
 
 # DotNet-style Syntax
-$b = [BigNum]6789
-$c = [BigComplex]"42-5i"
+$b = [BigNum]12345
+$d = [BigComplex]"42-7.5i"
 
 $sum = $a + $b
 $diff = $a - $b
