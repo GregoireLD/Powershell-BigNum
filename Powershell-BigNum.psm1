@@ -1459,6 +1459,109 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	#endregion static Hyperbolic Trigonometry Methods
 
 
+	#region combinatorial functions
+
+	#Pnk : Analytic Permutation. P(n,k) function. n! / (n-k)!.
+	static [BigComplex] Pnk([BigComplex] $n, [BigComplex] $k){
+		if($n.IsInteger() -and $n.IsPureReal() -and ($n -le -1)) {
+			throw "[BigComplex]::Pnk: n cannot be a negative integer (poles)."
+		}
+
+		if($n.IsInteger() -and $k.IsInteger() -and $n.IsPureReal() -and $k.IsPureReal()) {
+			return ([BigComplex]([BigComplex]::Permutation($n.realPart.Int(),$k.realPart.Int())))
+		}
+
+		# Domain guard: Gamma(n-k+1) must not hit a non-positive integer
+		[BigComplex] $denArg = ($n - $k) + 1
+		if ($denArg.IsInteger() -and $denArg.IsPureReal() -and ($denArg -le 0)) {
+			throw "[BigComplex]::Pnk: Gamma(n-k+1) pole (n-k+1 -le 0 integer)."
+		}
+		
+		$targetResolution = [System.Numerics.BigInteger]::Max($n.GetMaxDecimalResolution(),$k.GetMaxDecimalResolution())
+		$workResolution = $targetResolution + 10
+
+		$denArg = $denArg.CloneWithNewResolution($workResolution)
+		$tmpN = $n.CloneWithNewResolution($workResolution)
+
+		[BigComplex] $lnP = [BigComplex]::LnGammaComplex($tmpN + 1) - [BigComplex]::LnGammaComplex($denArg)
+		[BigComplex] $result = [BigComplex]::Exp($lnP)
+		return $result.CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	#Permutation : Classical Permutation. P(n,k) function. n! / (n-k)!.
+	static [System.Numerics.BigInteger] Permutation([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
+		if ($n -lt 0) {
+			throw "[BigComplex]::Permutation Error : n must be greater or equal to 0. Use [BigComplex]::Pnk for the full analytic continuation"
+		}
+		if ($k -lt 0) {
+			throw "[BigComplex]::Permutation Error : k must be greater or equal to 0. Use [BigComplex]::Pnk for the full analytic continuation"
+		}
+		return [BigNum]::Permutation($n, $k)
+	}
+
+	#Cnk : Analytic Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	static [BigComplex] Cnk([BigComplex] $n, [BigComplex] $k){
+		if($n.IsInteger() -and $n.IsPureReal() -and ($n -le -1)) {
+			throw "[BigComplex]::Cnk: n cannot be a negative integer (poles)."
+		}
+		if($k.IsInteger() -and $n.IsPureReal() -and ($k -le -1)) {
+			throw "[BigComplex]::Cnk: k cannot be a negative integer (poles)."
+		}
+
+		if($n.IsInteger() -and $k.IsInteger() -and $n.IsPureReal() -and $k.IsPureReal()) {
+			return ([BigComplex]([BigComplex]::Combination($n.realPart.Int(),$k.realPart.Int())))
+		}
+
+		$targetResolution = [System.Numerics.BigInteger]::Max($n.GetMaxDecimalResolution(),$k.GetMaxDecimalResolution())
+		$workResolution = $targetResolution + 10
+		
+		if(($n - $k).IsInteger() -and (($n - $k) -le -1)) {
+			return ([BigComplex]0).CloneAndRoundWithNewResolution($targetResolution)
+		}
+
+		$tmpN = $n.CloneWithNewResolution($workResolution)
+		$tmpK = $k.CloneWithNewResolution($workResolution)
+		$tmpNmK = $n - $k
+
+		[BigComplex] $lnC = [BigComplex]::LnGammaComplex($tmpN + 1) - [BigComplex]::LnGammaComplex($tmpK + 1) - [BigComplex]::LnGammaComplex($tmpNmK + 1)
+
+		$result = [BigComplex]::Exp($lnC)
+		return $result.CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	#Combination : Classical Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	static [System.Numerics.BigInteger] Combination([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
+		if ($n -lt 0) {
+			throw "[BigComplex]::Combination Error : n must be greater or equal to 0. Use [BigComplex]::Cnk for the full analytic continuation"
+		}
+		if ($k -lt 0) {
+			throw "[BigComplex]::Combination Error : k must be greater or equal to 0. Use [BigComplex]::Cnk for the full analytic continuation"
+		}
+		return [BigNum]::Combination($n, $k)
+	}
+
+	#CnkMulti : Analytic Multiset Combination (Multichoose). C(n+k-1, k).
+	static [BigComplex] CnkMulti([BigComplex] $n, [BigComplex] $k){
+		if($n.IsInteger() -and $k.IsInteger() -and $n.IsPureReal() -and $k.IsPureReal()) {
+			return ([BigComplex]([BigComplex]::CombinationMulti($n.realPart.Int(),$k.realPart.Int())))
+		}
+
+		$targetResolution = [System.Numerics.BigInteger]::Max($n.GetMaxDecimalResolution(),$k.GetMaxDecimalResolution())
+		$workResolution = $targetResolution + 10
+
+		[BigComplex] $newVal = $n+$k-1
+		[BigComplex] $newVal = $newVal.CloneAndRoundWithNewResolution($workResolution)
+		[BigComplex] $result = [BigComplex]::Cnk($newVal,$k)
+		return $result.CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	#CombinationMulti : Classical Multiset Combination (Multichoose). C(n+k-1, k).
+	static [System.Numerics.BigInteger] CombinationMulti([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
+		return [BigNum]::CombinationMulti($n, $k)
+	}
+
+	#endregion combinatorial functions
+
 
 	#region instance Methods
 
@@ -2685,7 +2788,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	}
 
 	# Gamma : Compute the value of the Gamma function for z.
-	hidden static [BigNum] Gamma( [BigNum] $z ) {
+	static [BigNum] Gamma( [BigNum] $z ) {
 		# integers -le 0 --> poles
 		if ($z.IsInteger() -and $z.IsNegative()) {
 			throw "[BigNum]::Gamma(): pole at negative or null integer z"
@@ -3452,7 +3555,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 		if($n.IsInteger() -and $k.IsInteger()) {
-			return ([BigNum]([BigNum]::CombinationInt($n.Int(),$k.Int())))
+			return ([BigNum]([BigNum]::Combination($n.Int(),$k.Int())))
 		}
 
 		$targetResolution = [System.Numerics.BigInteger]::Max($n.maxDecimalResolution,$k.maxDecimalResolution)
