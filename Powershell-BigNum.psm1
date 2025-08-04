@@ -2654,7 +2654,12 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 		
 		# Product 2..n (1 doesn't change)
-		return ([BigNum]([BigNum]::FactorialIntMulRange(2, $value.Int()))).CloneAndRoundWithNewResolution($targetResolution)
+		return ([BigNum]([BigNum]::FactorialInt($value.Int()))).CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	# FactorialInt : INTERNAL USE. Compute the Factorial of a BigInteger using the Split‑Recursive method.
+	hidden static [System.Numerics.BigInteger] FactorialInt( [System.Numerics.BigInteger] $value){
+		return ([BigNum]::FactorialIntMulRange(2, $value))
 	}
 
 	# FactorialIntMulRange : INTERNAL USE. Compute the Factorial using the Split‑Recursive method.
@@ -2680,51 +2685,94 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	}
 
 	# Gamma : Compute the value of the Gamma function for z.
-	static [BigNum] Gamma( [BigNum] $z ){
-
-		$targetResolution = $z.maxDecimalResolution
-
-		# integers ≤ 0  →  poles
+	hidden static [BigNum] Gamma( [BigNum] $z ) {
+		# integers -le 0 --> poles
 		if ($z.IsInteger() -and $z.IsNegative()) {
 			throw "[BigNum]::Gamma(): pole at negative or null integer z"
 		}
-		
-		if ($z -le 0) {
-			return [BigNum]::GammaNeg($z).CloneAndRoundWithNewResolution($targetResolution)
-		}
 
-		return [BigNum]::GammaPos($Z).CloneAndRoundWithNewResolution($targetResolution)
-	}
-
-	# GammaPos : INTERNAL USE. Compute the value of the Gamma function for positive $z.
-	hidden static [BigNum] GammaPos( [BigNum] $z ){
-
-		# $res = $z.maxDecimalResolution + 20
 		[System.Numerics.BigInteger] $targetResolution = $z.maxDecimalResolution
-		[System.Numerics.BigInteger] $workResolution = (([BigNum]$targetResolution)*1.1).Ceiling(0).Int()+10
+		[System.Numerics.BigInteger] $workResolution = (([BigNum]$targetResolution)*1.1).Ceiling(0).Int()+20
 
-		if ($z.IsInteger()) {
+		# fast path: positive integers
+		if ($z.IsInteger() -and ($z -gt 0)) {
 			return [BigNum]::Factorial($z-1).CloneAndRoundWithNewResolution($targetResolution)
 		}
 
-		$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($workResolution))
-		$G   = [BigNum]::Exp($lnG)
-		return $G.CloneAndRoundWithNewResolution($targetResolution)
+		# positive non-integer branch
+		if ($z -gt 0) {
+			$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($workResolution))
+			$G   = [BigNum]::Exp($lnG)
+			return $G.CloneAndRoundWithNewResolution($targetResolution)
+		}
+
+		# negative non-integer branch
+		[BigNum] $tmpZ = $z.CloneWithNewResolution($workResolution)
+		[BigNum] $constOne  = ([BigNum]1).CloneWithNewResolution($workResolution)
+		[BigNum] $constPi   = [BigNum]::Pi($workResolution)
+		
+		[BigNum] $sinPiZ = [BigNum]::Sin($constPi * $tmpZ)
+		if ($sinPiZ.IsNull()) {
+			# This would mean z is (near) an integer where sin(πz)=0 → pole handled above.
+			throw "[BigNum]::Gamma(): Sin(Pi*Z)=0 encountered (pole)."
+		}
+
+		[BigNum] $oneMinusZ = $constOne - $tmpZ
+    	[BigNum] $tmpLnGammaPos = [BigNum]::LnGammaPos($oneMinusZ)
+		[BigNum] $tmpGammaPos   = [BigNum]::Exp($tmpLnGammaPos)
+
+		[BigNum] $num = $constPi
+		[BigNum] $den = ($sinPiZ * $tmpGammaPos)
+		[BigNum] $result = $num / $den
+
+		return $result.CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	# LnGamma : INTERNAL USE. Compute the Log base e of the Gamma function.
+	hidden static [BigNum] LnGamma([BigNum] $z ){
+		if ($z.IsInteger() -and $z -le 0) {
+			throw "[BigNum]::LnGamma(): pole at non-positive integer z."
+		}
+
+		[System.Numerics.BigInteger] $targetResolution = $z.maxDecimalResolution
+		[System.Numerics.BigInteger] $workResolution = $targetResolution + 20
+
+		# Branch Positive z
+		if ($z -gt 0) {
+			return [BigNum]::LnGammaPos($z)
+		}
+
+		# Branch Negative z
+		[BigNum] $tmpZ  = $z.CloneWithNewResolution($workResolution)
+		[BigNum] $constOne  = ([BigNum]1).CloneWithNewResolution($workResolution)
+		[BigNum] $constPi   = [BigNum]::Pi($workResolution)
+		
+		[BigNum] $sinPiZ = [BigNum]::Sin($constPi * $tmpZ)
+		if ($sinPiZ.IsNull()) {
+			# This would mean z is (near) an integer where sin(πz)=0 → pole handled above.
+			throw "[BigNum]::LnGamma(): Sin(Pi*Z)=0 encountered (pole)."
+		}
+
+		[BigNum] $absSin = $sinPiZ.Abs()
+		[BigNum] $lnPi   = [BigNum]::Ln($constPi)
+    	[BigNum] $lnAbsSin = [BigNum]::Ln($absSin)
+
+		[BigNum] $oneMinusZ = $constOne - $tmpZ
+    	[BigNum] $tmpLnGammaPos = [BigNum]::LnGammaPos($oneMinusZ)
+
+		[BigNum] $result = ($lnPi - $lnAbsSin) - $tmpLnGammaPos
+
+		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	# LnGammaPos : INTERNAL USE. Compute the Log base e of the Gamma function.
 	hidden static [BigNum] LnGammaPos([BigNum] $z ){
 		if ($z -le 0) {
-			throw "[BigNum]::LnGammaPos(): z must be > 0 (use Gamma to get reflection)."
+			throw "[BigNum]::LnGammaPos(): z must be > 0."
 		}
-		if ($z.IsInteger()) {
-			throw "[BigNum]::LnGammaPos(): z must not be an integer."
-		}
-
 
 		[System.Numerics.BigInteger] $targetResolution = $z.maxDecimalResolution
-		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
-		# [System.Numerics.BigInteger] $targetRes = $z.maxDecimalResolution + 5
+		[System.Numerics.BigInteger] $workResolution = $targetResolution + 20
 
 		# Pick Spouge parameter a
         [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($workResolution)
@@ -2745,34 +2793,6 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		$LnGammaResult = ($term1 + $term2 + $term3)
 
 		return $LnGammaResult.CloneAndRoundWithNewResolution($targetResolution)
-	}
-
-	# GammaNeg : INTERNAL USE. Compute the value of the Gamma function for negative z.
-	hidden static [BigNum] GammaNeg( [BigNum] $z ){
-
-		# ---------- reflection branch (z < 0) ----------------------
-		# working precision: requested + 10 guard digits
-		[System.Numerics.BigInteger] $targetResolution = $z.GetMaxDecimalResolution() + 15
-		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
-		# [bigint] $targetRes = $z.GetMaxDecimalResolution()
-		[BigNum] $tmpZ = $z.CloneWithNewResolution($targetResolution)
-
-		# sin(π z)
-		[BigNum] $adaptPi    = [BigNum]::Pi($workResolution)
-		[BigNum] $sinPZ = [BigNum]::Sin($adaptPi * $tmpZ)  # you said sin works
-
-		# if sin(πz) too small, raise guard digits automatically
-		if ($sinPZ.Abs() -lt [BigNum]::PowTen(-$workResolution)) {
-			$wrk += 20         # adaptive bump
-			[BigNum] $adaptPi    = [BigNum]::Pi($workResolution)
-			$sinPZ  = [BigNum]::Sin($adaptPi * $tmpZ)
-		}
-
-		[BigNum] $oneMinusZ = ( [BigNum]::new(1).CloneWithNewResolution($targetResolution) - $tmpZ )
-		[BigNum] $gamma1mz  = [BigNum]::GammaPos($oneMinusZ)            # positive argument
-
-		[BigNum] $result = ( $adaptPi / $sinPZ ) / $gamma1mz
-		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	#endregion static Operators and Methods
@@ -3373,6 +3393,140 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	#endregion static Hyperbolic Trigonometry Methods
 
 
+	#region combinatorial functions
+
+	#Pnk : Analytic Permutation. P(n,k) function. n! / (n-k)!.
+	static [BigNum] Pnk([BigNum] $n, [BigNum] $k){
+		if($n.IsInteger() -and ($n -le -1)) {
+			throw "[BigNum]::Pnk: n cannot be a negative integer (poles)."
+		}
+
+		if($n.IsInteger() -and $k.IsInteger()) {
+			return ([BigNum]([BigNum]::Permutation($n.Int(),$k.Int())))
+		}
+
+		# Domain guard: Gamma(n-k+1) must not hit a non-positive integer
+		[BigNum] $denArg = ($n - $k) + 1
+		if ($denArg.IsInteger() -and $denArg -le 0) {
+			throw "[BigNum]::Pnk: Gamma(n-k+1) pole (n-k+1 -le 0 integer)."
+		}
+		
+		$targetResolution = [System.Numerics.BigInteger]::Max($n.maxDecimalResolution,$k.maxDecimalResolution)
+		$workResolution = $targetResolution + 10
+
+		$denArg = $denArg.CloneWithNewResolution($workResolution)
+		$tmpN = $n.CloneWithNewResolution($workResolution)
+
+		[BigNum] $lnP = [BigNum]::LnGamma($tmpN + 1) - [BigNum]::LnGamma($denArg)
+		[BigNum] $result = [BigNum]::Exp($lnP)
+		return $result.CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	#Permutation : Classical Permutation. P(n,k) function. n! / (n-k)!.
+	static [System.Numerics.BigInteger] Permutation([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
+		if ($n -lt 0) {
+			throw "[BigNum]::Permutation Error : n must be greater or equal to 0. Use [BigNum]::Pnk for the full analytic continuation"
+		}
+		if ($k -lt 0) {
+			throw "[BigNum]::Permutation Error : k must be greater or equal to 0. Use [BigNum]::Pnk for the full analytic continuation"
+		}
+		if ($k -gt $n) {
+			return 0
+		}
+		if ($k -eq 0) {
+			return 1
+		}
+
+		[System.Numerics.BigInteger] $lo = $n - $k + 1
+		[System.Numerics.BigInteger] $hi = $n
+		return [BigNum]::FactorialIntMulRange($lo, $hi)
+	}
+
+	#Cnk : Analytic Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	static [BigNum] Cnk([BigNum] $n, [BigNum] $k){
+		if($n.IsInteger() -and ($n -le -1)) {
+			throw "[BigNum]::Cnk: n cannot be a negative integer (poles)."
+		}
+		if($k.IsInteger() -and ($k -le -1)) {
+			throw "[BigNum]::Cnk: k cannot be a negative integer (poles)."
+		}
+
+		if($n.IsInteger() -and $k.IsInteger()) {
+			return ([BigNum]([BigNum]::CombinationInt($n.Int(),$k.Int())))
+		}
+
+		$targetResolution = [System.Numerics.BigInteger]::Max($n.maxDecimalResolution,$k.maxDecimalResolution)
+		$workResolution = $targetResolution + 10
+		
+		if(($n - $k).IsInteger() -and (($n - $k) -le -1)) {
+			return ([BigNum]0).CloneAndRoundWithNewResolution($targetResolution)
+		}
+
+		$tmpN = $n.CloneWithNewResolution($workResolution)
+		$tmpK = $k.CloneWithNewResolution($workResolution)
+		$tmpNmK = $n - $k
+
+		[BigNum] $lnC = [BigNum]::LnGamma($tmpN + 1) - [BigNum]::LnGamma($tmpK + 1) - [BigNum]::LnGamma($tmpNmK + 1)
+
+		$result = [BigNum]::Exp($lnC)
+		return $result.CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	#Combination : Classical Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	static [System.Numerics.BigInteger] Combination([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
+		if ($n -lt 0) {
+			throw "[BigNum]::Combination Error : n must be greater or equal to 0. Use [BigNum]::Cnk for the full analytic continuation"
+		}
+		if ($k -lt 0) {
+			throw "[BigNum]::Combination Error : k must be greater or equal to 0. Use [BigNum]::Cnk for the full analytic continuation"
+		}
+		if ($k -gt $n) {
+			return 0
+		}
+		if (($k -eq 0) -or ($n -eq $k)) {
+			return 1
+		}
+
+		if ($k -gt ($n - $k)) { $k = $n - $k }
+
+		[System.Numerics.BigInteger] $res = 1
+		for ([System.Numerics.BigInteger] $i = 1; $i -le $k; $i += 1) {
+			[System.Numerics.BigInteger] $num = $n - $k + $i
+			[System.Numerics.BigInteger] $den = $i
+
+			# reduce by gcd(num, den)
+			[System.Numerics.BigInteger] $g1 = [System.Numerics.BigInteger]::GreatestCommonDivisor($num, $den)
+			if ($g1 -gt 1) { $num /= $g1; $den /= $g1 }
+
+			
+			if ($den -gt 1) {
+				# reduce by gcd(res, den)
+				[System.Numerics.BigInteger] $g2 = [System.Numerics.BigInteger]::GreatestCommonDivisor($res, $den)
+				if ($g2 -gt 1) { $res /= $g2; $den /= $g2 }
+			}
+
+			$res *= $num
+			if ($den -gt 1) { $res /= $den }  # exact
+		}
+		return $res
+	}
+
+	#CnkMulti : Analytic Multiset Combination (Multichoose). C(n+k-1, k).
+	static [BigNum] CnkMulti([BigNum] $n, [BigNum] $k){
+		if($n.IsInteger() -and $k.IsInteger()) {
+			return ([BigNum]([BigNum]::CombinationMulti($n.Int(),$k.Int())))
+		}
+		[BigNum] $newVal = $n+$k-1
+		return [BigNum]::Cnk($newVal,$k)
+	}
+
+	#CombinationMulti : Classical Multiset Combination (Multichoose). C(n+k-1, k).
+	static [System.Numerics.BigInteger] CombinationMulti([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
+		return [BigNum]::Combination($n+$k-1,$k)
+	}
+
+	#endregion combinatorial functions
+
 
 	#region instance Methods
 
@@ -3858,7 +4012,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
     	}
 	}
 
-	# BernoulliNumberB : Generates the Nth Bernoulli Number at $res resolution. Uses Euler–Maclaurin convention: B1 = -1/2; B_odd>1 = 0.
+	# BernoulliNumberB : Generates the Nth Bernoulli Number at $res resolution. Uses Euler-Maclaurin convention: B1 = -1/2; B_odd>1 = 0.
 	static [BigNum] BernoulliNumberB([int] $n, [System.Numerics.BigInteger] $resolution) {
 		$targetResolution = $resolution
 
@@ -3873,7 +4027,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 				return [BigNum]::new(1).CloneAndRoundWithNewResolution($targetResolution)
 			}
 			1 {
-				# B1 = -1/2 in Euler–Maclaurin
+				# B1 = -1/2 in Euler-Maclaurin
 				return ([BigNum]::new(-1).CloneWithNewResolution($targetResolution) /
 						[BigNum]::new(2).CloneWithNewResolution($targetResolution)).CloneAndRoundWithNewResolution($targetResolution)
 			}
