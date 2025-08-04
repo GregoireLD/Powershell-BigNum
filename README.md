@@ -28,13 +28,17 @@ It includes a wide set of features: from basic arithmetic to transcendental func
 
 ✅ Inverse Hyperbolic Trigonometric functions (`Arcsinh`, `Arccosh`, `Arctanh`, `Arccsch`, `Arcsech`, `Arccoth`)
 
-✅ Other functions functions (`Factorial`, `Gamma`, `EuclideanDiv`, `Min`, `Max`)
+✅ Main Combinatorial functions (`Permutation`, `Combination`, `CombinationMulti`)
+
+✅ Main Analytic Combinatorial functions (`Pnk`, `Cnk`, `CnkMulti`)
+
+✅ Other functions (`Factorial`, `Gamma`, `EuclideanDiv`, `Min`, `Max`)
 
 ✅ Famous mathematical constants with arbitrary precision (`Pi`, `e`, `Tau`, `phi`)
 
 ✅ more mathematical constants with 1000 Digits (`EulerMascheroniGamma`, `AperyZeta3`, `CatalanG`, `FeigenbaumA`, `FeigenbaumDelta`)
 
-✅ Physical constants (speed of light, Planck constant, Avogadro, etc.)
+✅ Physical constants (`c` Speed of Light, `Plank_h`, `Plank_Reduced_h`, `Boltzmann_k`, `G` Gravitational Constant, `Avogadro_Mole`)
 
 ✅ Flexible decimal resolution control
 
