@@ -1,10 +1,11 @@
 
 #region Classes
 
-class BigFormula {
-    [string]                       $Source
-    [System.Numerics.BigInteger]   $targetResolution
-    [object[]]                     $Rpn                # output of parsing (Reverse Polish Notation)
+class BigFormula : System.IFormattable {
+    hidden[string]                       $Source
+    hidden [System.Numerics.BigInteger]   $targetResolution
+	hidden static [System.Numerics.BigInteger]   $defaultTargetResolution = 100
+    hidden [object[]]                     $Rpn                # output of parsing (Reverse Polish Notation)
     hidden [hashtable]             $Ops                # operator metadata
     hidden [hashtable]             $Funcs              # function table: name -> @{argc=..; fn=[scriptblock]}
     hidden [hashtable]             $Consts             # constants: name -> [BigNum]
@@ -12,7 +13,15 @@ class BigFormula {
     hidden [regex]                 $rxIdent  = '^[A-Za-z_][A-Za-z0-9_]*'
 
     BigFormula([string] $expr, [System.Numerics.BigInteger] $resolution) {
-        $this.Source     = $expr
+		$this.Init($expr,$resolution)
+    }
+
+	BigFormula([string] $expr) {
+		$this.Init($expr,[BigFormula]::defaultTargetResolution)
+	}
+
+	hidden [void] Init([string]$expr,[System.Numerics.BigInteger] $resolution) {
+		$this.Source     = $expr
         $this.targetResolution = $resolution
 
         # --- Operators: precedence (higher wins) & associativity
@@ -47,10 +56,6 @@ class BigFormula {
         }
 
         $this.Rpn = $this.ParseToRpn($expr)
-    }
-
-	BigFormula([string] $expr) {
-		[BigFormula]::BigFormula($expr,100)
 	}
 
 	[System.Numerics.BigInteger] GetTargetResolution() {
@@ -174,7 +179,7 @@ class BigFormula {
     }
 
 	[BigNum] Calculate() {
-		return [BigFormula]::Calculate(@{})
+		return $this.Calculate(([hashtable]@{}))
 	}
 
     [BigNum] Calculate([hashtable] $vars = @{}) {
@@ -230,7 +235,7 @@ class BigFormula {
 					$argc = [int]$fmeta['argc']
 					$fn   =      [scriptblock]$fmeta['fn']
 
-					# gather args in correct order (left-to-right)
+					# gather listArgs in correct order (left-to-right)
 					$listArgs = New-Object System.Collections.Generic.List[BigNum]
 					for ($i=0; $i -lt $argc; $i++) { $listArgs.Insert(0, $stack.Pop()) }
 
@@ -247,13 +252,165 @@ class BigFormula {
 		}
 		return $stack.Pop().CloneAndRoundWithNewResolution($res)
 	}
+
+	#region ToString method and helpers
+
+	# ToString : IFormattable Implementation. Return a culture-aware default string representation of the original BigFormula.
+	[string] ToString()
+	{
+		$currCulture = (Get-Culture)
+		return $this.ToString("G", $currCulture);
+	}
+	
+	# ToString : IFormattable Implementation. Return a culture-aware format-specific string representation of the original BigFormula.
+	[string] ToString([string] $format)
+	{
+		$currCulture = (Get-Culture)
+		return $this.ToString($format, $currCulture);
+	}
+
+	# ToString : IFormattable Implementation. Return a culture-specific default string representation of the original BigFormula.
+	[string] ToString([IFormatProvider] $provider)
+	{
+		return $this.ToString("G", $provider);
+	}
+
+	# ToString : IFormattable Implementation. Return a culture-aware string representation of the original BigFormula.
+	[string] ToString([string] $format, [IFormatProvider] $provider) {
+		# Stack holds fragments: @{ s = <string>; prec = <int> }
+		$stack = [System.Collections.Generic.Stack[object]]::new()
+
+		foreach ($node in $this.Rpn) {
+			switch ($node.kind) {
+				'num' {
+					$stack.Push(@{ s = $node.value.ToString(); prec = 100 })
+				}
+				'sym' {
+					$stack.Push(@{ s = [string]$node.name; prec = 100 })
+				}
+				'func' {
+					$fmeta = $this.Funcs[$node.name]
+					if (-not $fmeta) { throw "Unknown function '$($node.name)' in ToString()." }
+					$argc = [int]$fmeta['argc']
+					if ($argc -lt 0) { throw "Function '$($node.name)' must have fixed argc for pretty-print." }
+
+					$listArgs = New-Object System.Collections.Generic.List[string]
+					for ($i=0; $i -lt $argc; $i++) {
+						$frag = $stack.Pop()
+						$listArgs.Insert(0, $frag.s)  # preserve order
+					}
+					$stack.Push(@{ s = "$($node.name)($([string]::Join(', ', $listArgs)))"; prec = 100 })
+				}
+				'op' {
+					$op   = [string]$node.value
+					$meta = $this.TSHOpMeta($op,$this.Ops)
+					$argc = [int]$meta['argc']
+					$prec = [int]$meta['prec']
+					$assoc= [string]$meta['assoc']
+
+					if ($argc -eq 1) {
+						# unary operator
+						$arg = $stack.Pop()
+						$fix = [string]$meta['fix']
+						# Unary precedence relation uses 'unary' in TSHNeedParens() to be conservative
+						$need = $this.TSHNeedParens($arg.prec,$prec,$assoc,'unary')
+						$sArg = $this.TSHMaybeParen($arg.s,$need)
+						$fragText = if ($fix -eq 'postfix') { "$sArg$op" } else { "$op$sArg" }
+						$stack.Push(@{ s = $fragText; prec = $prec })
+					}
+					elseif ($argc -eq 2) {
+						$right = $stack.Pop()
+						$left  = $stack.Pop()
+						$needL = $this.TSHNeedParens($left.prec,$prec,$assoc,'left')
+						$needR = $this.TSHNeedParens($right.prec,$prec,$assoc,'right')
+
+						$sL = $this.TSHMaybeParen($left.s,$needL)
+						$sR = $this.TSHMaybeParen($right.s,$needR)
+
+						# small formatting tweak: no spaces around '^'
+						$fragText = if ($op -eq '^') { "$sL$op$sR" } else { "$sL $op $sR" }
+						$stack.Push(@{ s = $fragText; prec = $prec })
+					}
+					else {
+						throw "Operator '$op' with argc=$argc not supported in ToString()."
+					}
+				}
+				default {
+					throw "Unknown RPN node kind '$($node.kind)' in ToString()."
+				}
+			}
+		}
+
+		if ($stack.Count -ne 1) {
+			throw "ToString(): malformed RPN; stack has $($stack.Count) item(s)."
+		}
+		return ($stack.Pop().s)
+	}
+
+	hidden [System.Object] TSHOpMeta ([string]$op, [hashtable]$ops) {
+		$m = $ops[$op]
+		if (-not $m) { $m = @{} }
+
+		# precedence: higher = binds tighter
+		# typical math defaults if not provided:
+		#   +,- : 20 (left)
+		#   *,/ : 30 (left)
+		#    ^  : 40 (right)
+		#  unary: 35 (prefix, binds less than ^ per mathematical convention: -x^2 == -(x^2))
+		if (-not $m.ContainsKey('prec')) {
+			switch ($op) {
+				'+' { $m['prec'] = 20 }
+				'-' { $m['prec'] = if (($m['argc'] -as [int]) -eq 1) { 35 } else { 20 } }
+				'*' { $m['prec'] = 30 }
+				'/' { $m['prec'] = 30 }
+				'^' { $m['prec'] = 40 }
+				default { $m['prec'] = 25 } # unknown infix: middling precedence
+			}
+		}
+		if (-not $m.ContainsKey('assoc')) {
+			switch ($op) {
+				'^' { $m['assoc'] = 'right' }
+				default { $m['assoc'] = 'left' }
+			}
+		}
+		if (-not $m.ContainsKey('argc')) {
+			# assume binary unless told otherwise
+			$m['argc'] = 2
+		}
+		if (-not $m.ContainsKey('fix')) {
+			# for unary ops: 'prefix' or 'postfix'
+			$m['fix'] = 'prefix'
+		}
+		return $m
+	}
+
+	# Should we parenthesize a child around a parent operator?
+	hidden [bool] TSHNeedParens([int]$childPrec, [int]$parentPrec, [string]$parentAssoc, [string]$position) {
+		if ($parentAssoc -notin @('L','R')) { throw "TSHNeedParens : parentAssoc must be L or R" }
+		if ($position -notin @('left','right','unary')) { throw "TSHNeedParens : position must be left, right, or unary" }
+		if ($childPrec -lt $parentPrec) { return $true }    # child binds looser
+		if ($childPrec -gt $parentPrec) { return $false }   # child binds tighter
+		# equal precedence: depend on associativity & side
+		switch ($parentAssoc) {
+			'left'  { if ($position -eq 'right') { return $true }  else { return $false } }
+			'right' { if ($position -eq 'left')  { return $true }  else { return $false } }
+		}
+		return $true
+	}
+
+	hidden [string] TSHMaybeParen([string]$s, [bool]$need) {
+		if ($need) { return "($s)" }
+		return $s
+	}
+
+	#endregion ToString method and helpers
 }
 
 class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[object] {
 
 	hidden [BigNum] $realPart
 	hidden [BigNum] $imaginaryPart
-	static hidden [String] $iChar = [char]::ConvertFromUtf32(0x1d456)
+	hidden static [String] $iChar = [char]::ConvertFromUtf32(0x1d456)
 	
 	#region Constructors
 

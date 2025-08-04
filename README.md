@@ -2,7 +2,7 @@
 
 ⚡ **High-Precision Big Number Arithmetic in PowerShell** ⚡
 
-This project provides **`BigNum`, `BigComplex`, and preliminary `BigFormula` PowerShell class** designed for advanced mathematical operations with arbitrary-precision decimal numbers.
+This project provides **`BigNum`, `BigComplex`, and preliminary `BigFormula` PowerShell classes** designed for advanced mathematical operations with arbitrary-precision decimal numbers.
 It includes a wide set of features: from basic arithmetic to transcendental functions, roots, and famous mathematical and physical constants.
 
 > **Why?**
@@ -109,10 +109,11 @@ $c = [BigNum]::c()        # Speed of light (exact)
 ### Preliminary BigFormula syntax
 
 ```powershell
-$formula1 = [BigFormula]"42! + sqrt(8.5)"   # New Formula with default decimal precision
-$formula1.Calculate()     # Calculate formula1 with no extra parameters
+$formula1 = [BigFormula]"42! + sqrt(8.5)"           # New Formula with default decimal precision
+$formula1.Calculate()                               # Calculate formula1 with no extra parameters
+$formula1                                           # Display the formula, rebuilt from the internal representation
 $formula2 = [BigFormula]::new("x! + sqrt(y)", 10)   # New Formula with two variables and 10 decimal precision
-$formula2.Calculate(@{x = 25; y = "15.007"})     # Calculate formula2 with x and y as auto-casted BigNum extra parameters
+$formula2.Calculate(@{x = 25; y = "15.007"})        # Calculate formula2 with x and y as auto-casted BigNum extra parameters
 ```
 
 ---
