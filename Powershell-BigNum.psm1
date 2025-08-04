@@ -1,6 +1,254 @@
 
 #region Classes
 
+class BigFormula {
+    [string]                       $Source
+    [System.Numerics.BigInteger]   $targetResolution
+    [object[]]                     $Rpn                # output of parsing (Reverse Polish Notation)
+    hidden [hashtable]             $Ops                # operator metadata
+    hidden [hashtable]             $Funcs              # function table: name -> @{argc=..; fn=[scriptblock]}
+    hidden [hashtable]             $Consts             # constants: name -> [BigNum]
+    hidden [regex]                 $rxNumber = '^[0-9]+(\.[0-9]+)?([eE][+\-]?[0-9]+)?'
+    hidden [regex]                 $rxIdent  = '^[A-Za-z_][A-Za-z0-9_]*'
+
+    BigFormula([string] $expr, [System.Numerics.BigInteger] $resolution) {
+        $this.Source     = $expr
+        $this.targetResolution = $resolution
+
+        # --- Operators: precedence (higher wins) & associativity
+        $this.Ops = @{
+            '+' = @{ prec = 2; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a + $b } }
+            '-' = @{ prec = 2; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a - $b } }
+            '*' = @{ prec = 3; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a * $b } }
+            '/' = @{ prec = 3; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a / $b } }
+            '^' = @{ prec = 4; assoc = 'R'; argc = 2; type = 'op'; eval = { param($a,$b)  [BigNum]::Pow($a, $b) } }
+            'u-'= @{ prec = 5; assoc = 'R'; argc = 1; type = 'op'; eval = { param($a)     -$a } } # unary minus
+            '!' = @{ prec = 6; assoc = 'L'; argc = 1; type = 'postfix'; eval = { param($a) [BigNum]::Gamma($a + 1) } }
+        }
+
+        # --- Functions (fixed arity for simplicity)
+        $res = [System.Numerics.BigInteger]$this.targetResolution
+        $this.Funcs = @{
+            'sin'   = @{ argc = 1; fn = { param($x) [BigNum]::Sin($x) } }
+            'cos'   = @{ argc = 1; fn = { param($x) [BigNum]::Cos($x) } }
+            'tan'   = @{ argc = 1; fn = { param($x) [BigNum]::Tan($x) } }
+            'ln'    = @{ argc = 1; fn = { param($x) [BigNum]::Ln($x) } }
+            'exp'   = @{ argc = 1; fn = { param($x) [BigNum]::Exp($x) } }
+            'sqrt'  = @{ argc = 1; fn = { param($x) [BigNum]::Sqrt($x) } }
+            'gamma' = @{ argc = 1; fn = { param($x) [BigNum]::Gamma($x) } }
+            # add more: asin, acos, atan, sinh, cosh, etc.
+        }
+
+        # --- Constants (built once per instance at requested precision)
+        $this.Consts = @{
+            'pi'  = [BigNum]::Pi($res)
+            'tau' = [BigNum]::Tau($res)
+            'e'   = [BigNum]::Exp([BigNum]::new(1).CloneWithNewResolution($res))
+        }
+
+        $this.Rpn = $this.ParseToRpn($expr)
+    }
+
+	BigFormula([string] $expr) {
+		[BigFormula]::BigFormula($expr,100)
+	}
+
+	[System.Numerics.BigInteger] GetTargetResolution() {
+		return $this.targetResolution
+	}
+
+    [object[]] ParseToRpn([string] $expr) {
+        # Tokenize + shunting-yard
+        $tokens = $this.Tokenize($expr)
+        $out = New-Object System.Collections.Generic.List[object]
+        $stack = New-Object System.Collections.Generic.Stack[hashtable]
+        $expectUnary = $true  # at start, a '-' is unary
+
+        for ($i=0; $i -lt $tokens.Count; $i++) {
+            $t = $tokens[$i]
+            switch ($t.kind) {
+                'number' { $out.Add(@{ kind='num'; value=[BigNum]::new($t.value).CloneWithNewResolution($this.targetResolution) }); $expectUnary = $false }
+                'ident'  {
+                    # function or variable/constant?
+                    if ($i+1 -lt $tokens.Count -and $tokens[$i+1].kind -eq 'lparen') {
+                        # function call marker — push ident to stack
+                        $stack.Push(@{ kind='func'; name=$t.value })
+                    } else {
+                        # variable or constant -> output now
+                        $out.Add(@{ kind='sym'; name=$t.value })
+                    }
+                    $expectUnary = $false
+                }
+                'comma' {
+                    # pop until left paren on stack
+                    while ($stack.Count -and $stack.Peek().kind -ne 'lparen') {
+                        $out.Add($stack.Pop())
+                    }
+                    if (-not $stack.Count) { throw "Mismatched parentheses/comma." }
+                    $expectUnary = $true
+                }
+                'op' {
+                    $op = $t.value
+                    if ($op -eq '-' -and $expectUnary) { $op = 'u-' }
+                    $meta = $this.Ops[$op]
+                    if (-not $meta) { throw "Unknown operator '$op'." }
+                    while ($stack.Count) {
+                        $top = $stack.Peek()
+                        if ($top.kind -eq 'op') {
+                            $mt = $this.Ops[$top.value]
+                            $cond = ($meta.assoc -eq 'L' -and $meta.prec -le $mt.prec) -or
+                                    ($meta.assoc -eq 'R' -and $meta.prec -lt  $mt.prec)
+                            if ($cond) { $out.Add($stack.Pop()); continue }
+                        }
+                        break
+                    }
+                    $stack.Push(@{ kind='op'; value=$op })
+                    $expectUnary = $true
+                }
+                'postfix' {
+                    # postfix has highest precedence; emit directly
+                    $out.Add(@{ kind='op'; value='!' })
+                    $expectUnary = $false
+                }
+                'lparen' { $stack.Push(@{ kind='lparen' }); $expectUnary = $true }
+                'rparen' {
+                    while ($stack.Count -and $stack.Peek().kind -ne 'lparen') {
+                        $out.Add($stack.Pop())
+                    }
+                    if (-not $stack.Count) { throw "Mismatched parentheses." }
+                    $stack.Pop() | Out-Null  # discard '('
+
+                    # if function on top, pop it too to output
+                    if ($stack.Count -and $stack.Peek().kind -eq 'func') {
+                        $out.Add($stack.Pop())
+                    }
+                    $expectUnary = $false
+                }
+                default { throw "Unknown token kind '$($t.kind)'" }
+            }
+        }
+
+        while ($stack.Count) {
+            $x = $stack.Pop()
+            if ($x.kind -eq 'lparen') { throw "Mismatched parentheses at end." }
+            $out.Add($x)
+        }
+
+        return $out.ToArray()
+    }
+
+    [System.Collections.Generic.List[hashtable]] Tokenize([string] $s) {
+        $toks = [System.Collections.Generic.List[hashtable]]::new()
+        $i = 0
+        while ($i -lt $s.Length) {
+            $ch = $s[$i]
+            if ([char]::IsWhiteSpace($ch)) { $i++; continue }
+
+            if ($ch -match '[0-9]') {
+                $m = [regex]::Match($s.Substring($i), $this.rxNumber)
+                if (-not $m.Success) { throw "Bad number at index $i." }
+                $toks.Add(@{ kind='number'; value=$m.Value })
+                $i += $m.Length; continue
+            }
+
+            if ($ch -match '[A-Za-z_]' ) {
+                $m = [regex]::Match($s.Substring($i), $this.rxIdent)
+                $toks.Add(@{ kind='ident'; value=$m.Value.ToLowerInvariant() })
+                $i += $m.Length; continue
+            }
+
+            switch ($ch) {
+                '(' { $toks.Add(@{kind='lparen'}); $i++; continue }
+                ')' { $toks.Add(@{kind='rparen'}); $i++; continue }
+                ',' { $toks.Add(@{kind='comma'}); $i++; continue }
+                '+' { $toks.Add(@{kind='op'; value="$ch"}); $i++; continue }
+				'-' { $toks.Add(@{kind='op'; value="$ch"}); $i++; continue }
+				'*' { $toks.Add(@{kind='op'; value="$ch"}); $i++; continue }
+				'/' { $toks.Add(@{kind='op'; value="$ch"}); $i++; continue }
+				'^' { $toks.Add(@{kind='op'; value="$ch"}); $i++; continue }
+                '!' { $toks.Add(@{kind='postfix'}); $i++; continue }
+                default { throw "Unexpected char '$ch' at index $i." }
+            }
+        }
+        return $toks
+    }
+
+	[BigNum] Calculate() {
+		return [BigFormula]::Calculate(@{})
+	}
+
+    [BigNum] Calculate([hashtable] $vars = @{}) {
+		$stack = New-Object System.Collections.Generic.Stack[BigNum]
+		[System.Numerics.BigInteger]$res = [System.Numerics.BigInteger]$this.targetResolution
+
+		foreach ($node in $this.Rpn) {
+			switch ($node.kind) {
+				'num' {
+					$stack.Push($node.value.CloneWithNewResolution($res))
+				}
+
+				'sym' {
+					$name = $node.name
+					if ($this.Consts.ContainsKey($name)) {
+						$stack.Push($this.Consts[$name].CloneWithNewResolution($res))
+					}
+					elseif ($vars.ContainsKey($name)) {
+						$v = $vars[$name]
+						if ($v -is [BigNum]) { $stack.Push($v.CloneWithNewResolution($res)) }
+						else { $stack.Push([BigNum]::new($v).CloneWithNewResolution($res)) }
+					}
+					else {
+						throw "Unknown symbol '$name'. Provide it via -vars."
+					}
+				}
+
+				'op' {
+					$op   = $node.value
+					$meta = $this.Ops[$op]
+					if (-not $meta) { throw "Unknown operator '$op'." }
+
+					$argc = [int]$meta['argc']
+					$fn   =      [scriptblock]$meta['eval']   # get ScriptBlock from hashtable
+
+					if ($argc -eq 1) {
+						$a = $stack.Pop()
+						$r = $fn.InvokeReturnAsIs($a)
+						$stack.Push([BigNum]$r)
+					}
+					else {
+						$b = $stack.Pop()
+						$a = $stack.Pop()
+						$r = $fn.InvokeReturnAsIs($a, $b)
+						$stack.Push([BigNum]$r)
+					}
+				}
+
+				'func' {
+					$fmeta = $this.Funcs[$node.name]
+					if (-not $fmeta) { throw "Unknown function '$($node.name)'." }
+
+					$argc = [int]$fmeta['argc']
+					$fn   =      [scriptblock]$fmeta['fn']
+
+					# gather args in correct order (left-to-right)
+					$listArgs = New-Object System.Collections.Generic.List[BigNum]
+					for ($i=0; $i -lt $argc; $i++) { $listArgs.Insert(0, $stack.Pop()) }
+
+					$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
+					$stack.Push([BigNum]$r)
+				}
+
+				default { throw "Bad RPN node kind '$($node.kind)'" }
+			}
+		}
+
+		if ($stack.Count -ne 1) {
+			throw "Evaluation error: stack has $($stack.Count) values."
+		}
+		return $stack.Pop().CloneAndRoundWithNewResolution($res)
+	}
+}
+
 class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[object] {
 
 	hidden [BigNum] $realPart
