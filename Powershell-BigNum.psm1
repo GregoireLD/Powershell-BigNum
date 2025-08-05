@@ -2,15 +2,15 @@
 #region Classes
 
 class BigFormula : System.IFormattable {
-    hidden[string]                       $Source
-    hidden [System.Numerics.BigInteger]   $targetResolution
+    hidden[string]                               $Source
+    hidden [System.Numerics.BigInteger]          $targetResolution
 	hidden static [System.Numerics.BigInteger]   $defaultTargetResolution = 100
-    hidden [object[]]                     $Rpn                # output of parsing (Reverse Polish Notation)
-    hidden [hashtable]             $Ops                # operator metadata
-    hidden [hashtable]             $Funcs              # function table: name -> @{argc=..; fn=[scriptblock]}
-    hidden [hashtable]             $Consts             # constants: name -> [BigNum]
-    hidden [regex]                 $rxNumber = '^[0-9]+(\.[0-9]+)?([eE][+\-]?[0-9]+)?'
-    hidden [regex]                 $rxIdent  = '^[A-Za-z_][A-Za-z0-9_]*'
+    hidden [object[]]                            $Rpn                # output of parsing (Reverse Polish Notation)
+    hidden [hashtable]                           $Ops                # operator metadata
+    hidden [hashtable]                           $Funcs              # function table: name -> @{argc=..; fn=[scriptblock]}
+    hidden [hashtable]                           $Consts             # constants: name -> [BigNum]
+    hidden [regex]                               $rxNumber = '^[0-9]+(\.[0-9]+)?([eE][+\-]?[0-9]+)?'
+    hidden [regex]                               $rxIdent  = '^[A-Za-z_][A-Za-z0-9_]*'
 
     BigFormula([string] $expr, [System.Numerics.BigInteger] $resolution) {
 		$this.Init($expr,$resolution)
@@ -62,7 +62,13 @@ class BigFormula : System.IFormattable {
 		return $this.targetResolution
 	}
 
-    [object[]] ParseToRpn([string] $expr) {
+    hidden [object[]] ParseToRpn([string] $expr) {
+		# Define the decimal character
+		$deciChar = $(Get-Culture).NumberFormat.NumberDecimalSeparator
+		if ($deciChar -ne '.') {
+			$this.rxNumber = '^[0-9]+([\.\'+$deciChar+'][0-9]+)?([eE][+\-]?[0-9]+)?'
+		}
+
         # Tokenize + shunting-yard
         $tokens = $this.Tokenize($expr)
         $out = New-Object System.Collections.Generic.List[object]
@@ -142,7 +148,7 @@ class BigFormula : System.IFormattable {
         return $out.ToArray()
     }
 
-    [System.Collections.Generic.List[hashtable]] Tokenize([string] $s) {
+    hidden [System.Collections.Generic.List[hashtable]] Tokenize([string] $s) {
         $toks = [System.Collections.Generic.List[hashtable]]::new()
         $i = 0
         while ($i -lt $s.Length) {
@@ -283,7 +289,7 @@ class BigFormula : System.IFormattable {
 		foreach ($node in $this.Rpn) {
 			switch ($node.kind) {
 				'num' {
-					$stack.Push(@{ s = $node.value.ToString(); prec = 100 })
+					$stack.Push(@{ s = $node.value.ToString($format,$provider); prec = 100 })
 				}
 				'sym' {
 					$stack.Push(@{ s = [string]$node.name; prec = 100 })
