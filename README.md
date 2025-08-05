@@ -2,7 +2,7 @@
 
 ⚡ **High-Precision Big Number Arithmetic in PowerShell** ⚡
 
-This project provides **`BigNum`, `BigComplex`, and preliminary `BigFormula` PowerShell classes** designed for advanced mathematical operations with arbitrary-precision decimal numbers.
+This project provides **`BigNum`, `BigComplex`, and a preliminary `BigFormula` PowerShell classes** designed for advanced mathematical operations with arbitrary-precision decimal numbers.
 It includes a wide set of features: from basic arithmetic to transcendental functions, roots, and famous mathematical and physical constants.
 
 > **Why?**
@@ -91,7 +91,7 @@ $val = New-BigNum "2.5"
 $pow = [BigNum]::Pow($val, 3)
 $sqrt = [BigNum]::Sqrt($val)
 $cbrt = [BigNum]::Cbrt($val)
-$nroot = [BigNum]::NthRoot($val, [BigNum]5)
+$nroot = [BigNum]::NthRoot($val, 5)
 $exp = [BigNum]::Exp($val)
 $ln = [BigNum]::Ln($val)
 $log = [BigNum]::Log(10,$val)
@@ -106,14 +106,17 @@ $tau = [BigNum]::Tau(100) # Tau at 100 decimal precision
 $c = [BigNum]::c()        # Speed of light (exact)
 ```
 
-### Preliminary BigFormula syntax
+### BigFormula syntax
 
 ```powershell
-$formula1 = [BigFormula]"42! + sqrt(8.5)"           # New Formula with default decimal precision
+$formula1 = [BigFormula]"42! + sqrt(8.5)"           # New Formula with default decimal precision output
 $formula1.Calculate()                               # Calculate formula1 with no extra parameters
+$formula1.CalculateR()                              # Calculate formula1 but restricted to real numbers and functions
 $formula1                                           # Display the formula, rebuilt from the internal representation
-$formula2 = [BigFormula]::new("x! + sqrt(y)", 10)   # New Formula with two variables and 10 decimal precision
+$formula2 = [BigFormula]::new("x! + sqrt(y)", 10)   # New Formula with two variables and 10 decimal precision output
 $formula2.Calculate(@{x = 25; y = "15.007"})        # Calculate formula2 with x and y as auto-casted BigNum extra parameters
+$formula3 = [BigFormula]"2exp(3i*Tau/2)"            # New Formula with implicit multiplications
+$formula3                                           # Display the formula and reveal implicit multiplications
 ```
 
 ---
@@ -123,11 +126,12 @@ $formula2.Calculate(@{x = 25; y = "15.007"})        # Calculate formula2 with x 
 Each `BigNum` instance has a **maximum decimal resolution**.
 * list of cloning methods to alter the maximum decimal resolution (all create a new instance):
   * `.CloneWithNewResolution()` → Make "maximum decimal resolution" to match "val", and truncate if needed
+  * `.CloneAndRoundWithNewResolution()` → Reduce "maximum decimal resolution" to match "val", and round if needed
   * `.CloneWithAddedResolution()` → Make "maximum decimal resolution" increase by "val"
   * `.CloneWithAdjustedResolution()` → Shorten the "maximum decimal resolution" to the current decimal expansion lenght
   * `.CloneAndReducePrecisionBy()` → Reduce "maximum decimal resolution" by "val", and round if needed
 
-* list of Rounding methods (all create new instances, and leave maximum decimal resolution untouched):
+* list of Rounding methods (all create new instances, and leave the internal maximum decimal resolution untouched):
   * `.Round()` → Round to the the closest value of desired length, 0,5 are rounded away from zero
   * `.Ceiling()` → Round to a bigger or equal value of desired length
   * `.Floor()` → Round to a lower or equal value of desired length
@@ -155,7 +159,7 @@ Handles both efficiently:
 $result = [BigNum]::NthRootInt($val, 7)
 
 # General root (including non-integer)
-$result = [BigNum]::NthRoot($val, [BigNum]"2.5")
+$result = [BigNum]::NthRoot($val, "2.5")
 ```
 
 ### Cached Constants
@@ -194,8 +198,7 @@ To clear them:
 
 ## 🧪 Planned Improvements
 
-* Complex number support (Preliminary works started on the BigComplex class)
-* Performance optimizations
+* Performance optimizations on the Gamma functions
 
 ---
 

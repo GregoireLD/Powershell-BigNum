@@ -5,12 +5,17 @@ class BigFormula : System.IFormattable {
     hidden [string]                              $sourceExpr
     hidden [System.Numerics.BigInteger]          $targetResolution
 	hidden static [System.Numerics.BigInteger]   $defaultTargetResolution = 100
+	hidden static [System.Numerics.BigInteger]   $GuardPerLevel = 5
+	hidden static [string]                       $iChar = [char]::ConvertFromUtf32(0x1D456)
     hidden [object[]]                            $Rpn                # output of parsing (Reverse Polish Notation)
-    hidden [hashtable]                           $Ops                # operator metadata
-    hidden [hashtable]                           $Funcs              # function table: name -> @{argc=..; fn=[scriptblock]}
-    hidden [hashtable]                           $Consts             # constants: name -> [BigNum]
+    hidden [hashtable]                           $OpsR               # Real operator metadata
+	hidden [hashtable]                           $OpsC               # Complex operator metadata
+    hidden [hashtable]                           $FuncsR             # Real function table: name -> @{argc=..; fn=[scriptblock]}
+	hidden [hashtable]                           $FuncsC             # Complex function table: name -> @{argc=..; fn=[scriptblock]}
+    hidden [hashtable]                           $ConstsR            # Real constants: name -> [BigNum]
+	hidden [hashtable]                           $ConstsC            # Complex constants: name -> [BigNum]
     hidden [regex]                               $rxNumber = '^[0-9]+(\.[0-9]+)?([eE][+\-]?[0-9]+)?'
-    hidden [regex]                               $rxIdent  = '^[A-Za-z_][A-Za-z0-9_]*'
+    hidden [regex]                               $rxIdent  = '^\p{L}[\p{L}\p{Nd}_]*'
 
     BigFormula([string] $expr, [System.Numerics.BigInteger] $resolution) {
 		$this.Init($expr,$resolution)
@@ -24,9 +29,12 @@ class BigFormula : System.IFormattable {
 		$this.sourceExpr = $bigFormula.sourceExpr.Clone()
 		$this.targetResolution = [System.Numerics.BigInteger]::parse($bigFormula.targetResolution)
 		$this.Rpn = $bigFormula.Rpn.Clone()
-		$this.Ops = $bigFormula.Ops.Clone()
-		$this.Funcs = $bigFormula.Funcs.Clone()
-		$this.Consts = $bigFormula.Consts.Clone()
+		$this.OpsR = $bigFormula.OpsR.Clone()
+		$this.OpsC = $bigFormula.OpsC.Clone()
+		$this.FuncsR = $bigFormula.FuncsR.Clone()
+		$this.FuncsC = $bigFormula.FuncsC.Clone()
+		$this.ConstsR = $bigFormula.ConstsR.Clone()
+		$this.ConstsC = $bigFormula.ConstsC.Clone()
 		$this.rxNumber = ([regex]($bigFormula.rxNumber.ToString()))
 		$this.rxIdent = ([regex]($bigFormula.rxIdent.ToString()))
 	}
@@ -35,48 +43,96 @@ class BigFormula : System.IFormattable {
 		$this.sourceExpr = $bigFormula.sourceExpr.Clone()
 		$this.targetResolution = [System.Numerics.BigInteger]::parse($newResolution)
 		$this.Rpn = $bigFormula.Rpn.Clone()
-		$this.Ops = $bigFormula.Ops.Clone()
-		$this.Funcs = $bigFormula.Funcs.Clone()
-		$this.Consts = $bigFormula.Consts.Clone()
+		$this.OpsR = $bigFormula.OpsR.Clone()
+		$this.OpsC = $bigFormula.OpsC.Clone()
+		$this.FuncsR = $bigFormula.FuncsR.Clone()
+		$this.FuncsC = $bigFormula.FuncsC.Clone()
+		$this.ConstsR = $bigFormula.ConstsR.Clone()
+		$this.ConstsC = $bigFormula.ConstsC.Clone()
 		$this.rxNumber = ([regex]($bigFormula.rxNumber.ToString()))
 		$this.rxIdent = ([regex]($bigFormula.rxIdent.ToString()))
 	}
 
 	hidden [void] Init([string]$expr,[System.Numerics.BigInteger] $resolution) {
-		$this.sourceExpr     = $expr
+
+		[switch]$useNfkc = $false  # set true if you want broader Unicode normalization
+		$cleanExpr = $expr.Replace([BigFormula]::iChar, 'i')
+		if ($useNfkc) { $cleanExpr = $cleanExpr.Normalize([Text.NormalizationForm]::FormKC) }
+
+		$this.sourceExpr = $cleanExpr
         $this.targetResolution = $resolution
 
-        # --- Operators: precedence (higher wins) & associativity
-        $this.Ops = @{
-            '+' = @{ prec = 2; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a + $b } }
-            '-' = @{ prec = 2; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a - $b } }
-            '*' = @{ prec = 3; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a * $b } }
-            '/' = @{ prec = 3; assoc = 'L'; argc = 2; type = 'op'; eval = { param($a,$b)  $a / $b } }
-            '^' = @{ prec = 4; assoc = 'R'; argc = 2; type = 'op'; eval = { param($a,$b)  [BigNum]::Pow($a, $b) } }
-            'u-'= @{ prec = 5; assoc = 'R'; argc = 1; type = 'op'; eval = { param($a)     -$a } } # unary minus
-            '!' = @{ prec = 6; assoc = 'L'; argc = 1; type = 'postfix'; eval = { param($a) [BigNum]::Gamma($a + 1) } }
+        # --- Real Operators: precedence (higher wins) & associativity
+        $this.OpsR = @{
+            '+' = @{ prec = 2; assoc = 'L'; argc = 2; resBonus =  0 ; type = 'op'; fn = { param($a,$b)  $a + $b } }
+            '-' = @{ prec = 2; assoc = 'L'; argc = 2; resBonus =  0 ; type = 'op'; fn = { param($a,$b)  $a - $b } }
+            '*' = @{ prec = 3; assoc = 'L'; argc = 2; resBonus =  2 ; type = 'op'; fn = { param($a,$b)  $a * $b } }
+            '/' = @{ prec = 3; assoc = 'L'; argc = 2; resBonus =  6 ; type = 'op'; fn = { param($a,$b)  $a / $b } }
+            '^' = @{ prec = 4; assoc = 'R'; argc = 2; resBonus = 10 ; type = 'op'; fn = { param($a,$b)  [BigNum]::Pow($a, $b) } }
+            'u-'= @{ prec = 5; assoc = 'R'; argc = 1; resBonus =  2 ; type = 'op'; fn = { param($a)     -$a } } # unary minus
+            '!' = @{ prec = 6; assoc = 'L'; argc = 1; resBonus =  8 ; type = 'postfix'; fn = { param($a) [BigNum]::Gamma($a + 1).CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } }
         }
 
-        # --- Functions (fixed arity for simplicity)
-        $this.Funcs = @{
-            'sin'   = @{ argc = 1; fn = { param($x) [BigNum]::Sin($x) } }
-            'cos'   = @{ argc = 1; fn = { param($x) [BigNum]::Cos($x) } }
-            'tan'   = @{ argc = 1; fn = { param($x) [BigNum]::Tan($x) } }
-            'ln'    = @{ argc = 1; fn = { param($x) [BigNum]::Ln($x) } }
-            'exp'   = @{ argc = 1; fn = { param($x) [BigNum]::Exp($x) } }
-            'sqrt'  = @{ argc = 1; fn = { param($x) [BigNum]::Sqrt($x) } }
-            'gamma' = @{ argc = 1; fn = { param($x) [BigNum]::Gamma($x) } }
+		# --- Complex Operators: precedence (higher wins) & associativity. (use your BigComplex arithmetic)
+		$this.OpsC = @{
+			'+' = @{ prec=20; assoc='L'; argc = 2; resBonus =  0 ; fn = { param($a,$b) $a + $b } }
+			'-' = @{ prec=20; assoc='L'; argc = 2; resBonus =  0 ; fn = { param($a,$b) $a - $b } }
+			'*' = @{ prec=30; assoc='L'; argc = 2; resBonus =  2 ; fn = { param($a,$b) $a * $b } }
+			'/' = @{ prec=30; assoc='L'; argc = 2; resBonus =  6 ; fn = { param($a,$b) $a / $b } }
+			'^' = @{ prec=40; assoc='R'; argc = 2; resBonus = 10 ; fn = { param($a,$b) [BigComplex]::Pow($a,$b) } }
+			'u-'= @{ prec=35; assoc='R'; argc = 1; resBonus =  2 ; fn = { param($a)    -$a } }  # unary minus
+			'!' = @{ prec=45; assoc='L'; argc = 1; resBonus =  8 ; fn = { param($a)    [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } } # factorial → Γ(z+1)
+		}
+
+
+        # --- Real Functions (fixed arity for simplicity)
+        $this.FuncsR = @{
+            'sin'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Sin($x) } }
+            'cos'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Cos($x) } }
+            'tan'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Tan($x) } }
+            'ln'    = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Ln($x) } }
+            'exp'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Exp($x) } }
+            'sqrt'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Sqrt($x) } }
+            'gamma' = @{ argc = 1 ; resBonus = 12 ; fn = { param($x) [BigNum]::Gamma($x) } }
             # add more: asin, acos, atan, sinh, cosh, etc.
         }
 
-        # --- Constants (built once per instance at requested precision)
-        $this.Consts = @{
+		# --- Complex Functions (fixed arity for simplicity)
+		$this.FuncsC = @{
+			'sin'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($z) [BigComplex]::Sin($z) } }
+			'cos'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($z) [BigComplex]::Cos($z) } }
+			'tan'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($z) [BigComplex]::Tan($z) } }
+			'asin'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($z) [BigComplex]::Arcsin($z) } }
+			'acos'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($z) [BigComplex]::Arccos($z) } }
+			'atan'  = @{ argc = 1 ; resBonus = 10 ; fn = { param($z) [BigComplex]::Arctan($z) } }
+			'sinh'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($z) [BigComplex]::Sinh($z) } }
+			'cosh'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($z) [BigComplex]::Cosh($z) } }
+			'tanh'  = @{ argc = 1 ; resBonus = 10 ; fn = { param($z) [BigComplex]::Tanh($z) } }
+			'exp'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($z) [BigComplex]::Exp($z) } }
+			'ln'    = @{ argc = 1 ; resBonus = 10 ; fn = { param($z) [BigComplex]::Ln($z) } }
+			'sqrt'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($z) [BigComplex]::Sqrt($z) } }
+			'gamma' = @{ argc = 1 ; resBonus = 12 ; fn = { param($z) [BigComplex]::Gamma($z) } }
+			# add more as needed
+		}
+
+        # --- Real Constants (built once per instance at requested precision)
+        $this.ConstsR = @{
             'pi'  = [BigNum]::Pi($this.GetWorkResolution())
             'tau' = [BigNum]::Tau($this.GetWorkResolution())
             'e'   = [BigNum]::e($this.GetWorkResolution())
         }
 
-        $this.Rpn = $this.ParseToRpn($expr)
+		# --- Complex Constants (note both 'i' and 𝑖)
+		$this.ConstsC = @{
+			'pi' = [BigComplex]::new([BigNum]::Pi($this.GetWorkResolution()), [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'τ'  = [BigComplex]::new([BigNum]::Tau($this.GetWorkResolution()), [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'tau'= [BigComplex]::new([BigNum]::Tau($this.GetWorkResolution()), [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'e'  = [BigComplex]::new([BigNum]::e($this.GetWorkResolution()),   [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'i'  = ([BigComplex]"i").CloneWithNewResolution($this.GetWorkResolution())
+			# [BigFormula]::iChar = ([BigComplex]"i").CloneWithNewResolution($this.GetWorkResolution())
+		}
+
+        $this.Rpn = $this.ParseToRpn($this.sourceExpr)
 	}
 
 	[BigFormula] CloneWithNewTargetResolution([System.Numerics.BigInteger] $newResolution) {
@@ -104,6 +160,8 @@ class BigFormula : System.IFormattable {
 
         # Tokenize + shunting-yard
         $tokens = $this.Tokenize($expr)
+		$tokens = $this.InsertImplicitMultiplication($tokens)
+
         $out = New-Object System.Collections.Generic.List[object]
         $stack = New-Object System.Collections.Generic.Stack[hashtable]
         $expectUnary = $true  # at start, a '-' is unary
@@ -134,12 +192,12 @@ class BigFormula : System.IFormattable {
                 'op' {
                     $op = $t.value
                     if ($op -eq '-' -and $expectUnary) { $op = 'u-' }
-                    $meta = $this.Ops[$op]
+                    $meta = $this.OpsR[$op]
                     if (-not $meta) { throw "Unknown operator '$op'." }
                     while ($stack.Count) {
                         $top = $stack.Peek()
                         if ($top.kind -eq 'op') {
-                            $mt = $this.Ops[$top.value]
+                            $mt = $this.OpsR[$top.value]
                             $cond = ($meta.assoc -eq 'L' -and $meta.prec -le $mt.prec) -or
                                     ($meta.assoc -eq 'R' -and $meta.prec -lt  $mt.prec)
                             if ($cond) { $out.Add($stack.Pop()); continue }
@@ -197,10 +255,10 @@ class BigFormula : System.IFormattable {
 
             if ($ch -match '[A-Za-z_]' ) {
                 $m = [regex]::Match($s.Substring($i), $this.rxIdent)
-                $toks.Add(@{ kind='ident'; value=$m.Value.ToLowerInvariant() })
+				$toks.Add(@{ kind='ident'; value=$m.Value.ToLowerInvariant() })
                 $i += $m.Length; continue
             }
-
+			
             switch ($ch) {
                 '(' { $toks.Add(@{kind='lparen'}); $i++; continue }
                 ')' { $toks.Add(@{kind='rparen'}); $i++; continue }
@@ -214,82 +272,424 @@ class BigFormula : System.IFormattable {
                 default { throw "Unexpected char '$ch' at index $i." }
             }
         }
+
         return $toks
     }
 
-	[BigNum] Calculate() {
-		return $this.Calculate(([hashtable]@{}))
-	}
+	hidden [System.Collections.Generic.List[hashtable]] InsertImplicitMultiplication( [System.Collections.Generic.List[hashtable]] $toks ) {
+		$out = [System.Collections.Generic.List[hashtable]]::new()
 
-    [BigNum] Calculate([hashtable] $vars = @{}) {
-		$stack = New-Object System.Collections.Generic.Stack[BigNum]
-
-		foreach ($node in $this.Rpn) {
-			switch ($node.kind) {
-				'num' {
-					$stack.Push($node.value.CloneWithNewResolution($this.GetWorkResolution()))
-				}
-
-				'sym' {
-					$name = $node.name
-					if ($this.Consts.ContainsKey($name)) {
-						$stack.Push($this.Consts[$name].CloneWithNewResolution($this.GetWorkResolution()))
-					}
-					elseif ($vars.ContainsKey($name)) {
-						$v = $vars[$name]
-						if ($v -is [BigNum]) { $stack.Push($v.CloneWithNewResolution($this.GetWorkResolution())) }
-						else { $stack.Push([BigNum]::new($v).CloneWithNewResolution($this.GetWorkResolution())) }
-					}
-					else {
-						throw "Unknown symbol '$name'. Provide it via Calculate parameter (vars)."
-					}
-				}
-
-				'op' {
-					$op   = $node.value
-					$meta = $this.Ops[$op]
-					if (-not $meta) { throw "Unknown operator '$op'." }
-
-					$argc = [int]$meta['argc']
-					$fn   =      [scriptblock]$meta['eval']   # get ScriptBlock from hashtable
-
-					if ($argc -eq 1) {
-						$a = $stack.Pop()
-						$r = $fn.InvokeReturnAsIs($a)
-						$stack.Push([BigNum]$r)
-					}
-					else {
-						$b = $stack.Pop()
-						$a = $stack.Pop()
-						$r = $fn.InvokeReturnAsIs($a, $b)
-						$stack.Push([BigNum]$r)
-					}
-				}
-
-				'func' {
-					$fmeta = $this.Funcs[$node.name]
-					if (-not $fmeta) { throw "Unknown function '$($node.name)'." }
-
-					$argc = [int]$fmeta['argc']
-					$fn   =      [scriptblock]$fmeta['fn']
-
-					# gather listArgs in correct order (left-to-right)
-					$listArgs = New-Object System.Collections.Generic.List[BigNum]
-					for ($i=0; $i -lt $argc; $i++) { $listArgs.Insert(0, $stack.Pop()) }
-
-					$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
-					$stack.Push([BigNum]$r)
-				}
-
-				default { throw "Bad RPN node kind '$($node.kind)'" }
+		function EndsValue([hashtable] $t) {
+			switch ($t.kind) {
+				'number' { return $true }
+				'ident'  { return $true }   # variable/constant; function name still counts as a “value starter” for the next token
+				'rparen' { return $true }
+				'postfix'{ return $true }   # factorial '!'
+				default  { return $false }
 			}
 		}
 
-		if ($stack.Count -ne 1) {
-			throw "Evaluation error: stack has $($stack.Count) values."
+		function StartsValue([hashtable] $t) {
+			switch ($t.kind) {
+				'number' { return $true }
+				'ident'  { return $true }   # variable or function name
+				'lparen' { return $true }
+				default  { return $false }
+			}
 		}
-		return $stack.Pop().CloneAndRoundWithNewResolution($this.targetResolution)
+
+		for ($i = 0; $i -lt $toks.Count; $i++) {
+			$cur = $toks[$i]
+			if ($out.Count -gt 0) {
+				$prev = $out[$out.Count - 1]
+
+				$needStar = (EndsValue($prev)) -and (StartsValue($cur))
+
+				if ($needStar) {
+					# Suppress implicit '*' for function-call pattern: ident(lparen)
+					if ($prev.kind -eq 'ident' -and $cur.kind -eq 'lparen') {
+						if ($this.IsFunctionName($prev.value)) {
+							$needStar = $false
+						}
+					}
+				}
+
+				if ($needStar) {
+					$out.Add(@{ kind='op'; value='*' })
+				}
+			}
+			$out.Add($cur)
+		}
+
+		return $out
 	}
+
+	hidden [bool] IsFunctionName([string] $name) {
+		if (-not $name) { return $false }
+		$n = $name.ToLowerInvariant()
+
+		# If you already have a single dispatch table:
+		# return $this.fnTable.ContainsKey($n)
+
+		# Otherwise, union across your arity maps (adjust names to yours):
+		return (
+			($this.FuncsR  -and $this.FuncsR.ContainsKey($n))  -or
+			($this.FuncsC -and $this.FuncsC.ContainsKey($n))
+		)
+	}
+
+	#region Calculate method and helpers
+
+	hidden [BfNode] BuildAstFromRpn([bool] $complexMode) {
+		$tmpOps   = $complexMode ? $this.OpsC   : $this.OpsR
+		$tmpFuncs = $complexMode ? $this.FuncsC : $this.FuncsR
+
+		$stack = [System.Collections.Generic.Stack[BfNode]]::new()
+		foreach ($tok in $this.Rpn) {
+			switch ($tok.kind) {
+				'num' {
+					$n = [BfNode]::new('num', $null, $tok.value)
+					$stack.Push($n)
+				}
+				'sym' {
+					$n = [BfNode]::new('sym', $tok.name, $null)
+					$stack.Push($n)
+				}
+				'op' {
+					$meta = $tmpOps[[string]$tok.value]
+					if (-not $meta) { throw "Unknown operator '$($tok.value)'" }
+					$argc = [int]$meta['argc']
+					$n = [BfNode]::new('op', [string]$tok.value, $null)
+					for ($i=0; $i -lt $argc; $i++) { $n.Children.Insert(0, $stack.Pop()) }
+					$stack.Push($n)
+				}
+				'func' {
+					$meta = $tmpFuncs[$tok.name]
+					if (-not $meta) { throw "Unknown function '$($tok.name)'" }
+					$argc = [int]$meta['argc']
+					$n = [BfNode]::new('func', $tok.name, $null)
+					for ($i=0; $i -lt $argc; $i++) { $n.Children.Insert(0, $stack.Pop()) }
+					$stack.Push($n)
+				}
+				default { throw "Unknown RPN token kind '$($tok.kind)'" }
+			}
+		}
+		if ($stack.Count -ne 1) { throw "Malformed RPN; stack ended with $($stack.Count) item(s)." }
+		$root = $stack.Pop()
+
+		# annotate depth
+		function SetDepth([BfNode]$node,[int]$d){
+			$node.Depth = $d
+			foreach($c in $node.Children){ SetDepth $c ($d+1) }
+		}
+		SetDepth $root 0
+		return $root
+	}
+
+	hidden [BigNum] EvalNodeReal([BfNode]$n,[int]$basePrec,[hashtable]$vars){
+		$tmpOps   = $this.OpsR
+		$tmpFuncs = $this.FuncsR
+		$tmpConst = $this.ConstsR
+
+		$p = $this.NodePrec($basePrec, $n.Depth, $n.Kind, $n.Name)
+
+		switch ($n.Kind) {
+			'num' { return $this.EnsureBN($n.Value, $p) }
+			'sym' {
+				if ($vars.ContainsKey($n.Name)) {
+					$v = $vars[$n.Name]
+					if ($v -isnot [BigNum]) { $v = [BigNum]::new($v) }
+					return $this.EnsureBN($v, $p)
+				}
+				if ($tmpConst.ContainsKey($n.Name)) { return $this.EnsureBN($tmpConst[$n.Name], $p) }
+				if ($n.Name -eq "i") { throw "Symbol i detected. Use Calculate instead for complex evaluation" }
+				throw "Unknown symbol '$($n.Name)'."
+			}
+			'func' {
+				$meta = $tmpFuncs[$n.Name]; if (-not $meta){ throw "Unknown function '$($n.Name)'" }
+				$argc = [int]$meta['argc']
+				$fn   = [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
+
+				$listArgs = New-Object System.Collections.Generic.List[BigNum]
+				for($i=0;$i -lt $argc;$i++){
+					$tmpBN = $this.EvalNodeReal($n.Children[$i], $basePrec, $vars)
+					# promote args to this node precision
+					$tmpBN = $this.EnsureBN($tmpBN,$p)
+					$listArgs.Insert(0,$tmpBN)
+				}
+				
+				$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
+				return $r.CloneWithNewResolution($p)
+			}
+			'op' {
+				$meta = $tmpOps[$n.Name]; if (-not $meta){ throw "Unknown operator '$($n.Name)'" }
+				$argc = [int]$meta['argc']
+				$fn   = [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
+				if ($argc -eq 1) {
+					$a = $this.EnsureBN( ($this.EvalNodeReal($n.Children[0],$basePrec,$vars)), $p)
+					$r = $fn.InvokeReturnAsIs($a)
+					return $r.CloneWithNewResolution($p)
+				} else {
+					$a = $this.EnsureBN( ($this.EvalNodeReal($n.Children[0],$basePrec,$vars)), $p)
+					$b = $this.EnsureBN( ($this.EvalNodeReal($n.Children[1],$basePrec,$vars)), $p)
+					$r = $fn.InvokeReturnAsIs($a,$b)
+					return $r.CloneWithNewResolution($p)
+				}
+			}
+			default { throw "Unknown node kind '$($n.Kind)'" }
+		}
+		throw "Error in EvalNodeReal : We should not get here"
+		return $null
+	}
+
+	hidden [BigComplex] EvalNodeComplex([BfNode]$n,[int]$basePrec,[hashtable]$vars){
+		$tmpOps   = $this.OpsC
+		$tmpFuncs = $this.FuncsC
+		$tmpConst = $this.ConstsC
+
+		$p = $this.NodePrec($basePrec, $n.Depth, $n.Kind, $n.Name)
+
+		switch ($n.Kind) {
+			'num' {
+				$bn = $this.EnsureBC($n.Value,$p)
+            	return [BigComplex]::new($bn).CloneWithNewResolution($p)
+			}
+			'sym' {
+				if ($vars.ContainsKey($n.Name)) {
+					$v = $vars[$n.Name]
+					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
+					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
+					return $this.EnsureBC([BigComplex]::new([BigNum]$v),$p)
+					# throw "Variable '$($n.Name)' must be BigNum or BigComplex."
+				}
+				if ($tmpConst.ContainsKey($n.Name)) { return $this.EnsureBC($tmpConst[$n.Name], $p) }
+				throw "Unknown symbol '$($n.Name)'."
+			}
+			'func' {
+				$meta = $tmpFuncs[$n.Name]; if (-not $meta){ throw "Unknown function '$($n.Name)'" }
+				$argc = [int]$meta['argc']
+				$fn   = [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
+				$listArgs = New-Object System.Collections.Generic.List[BigComplex]
+				for($i=0;$i -lt $argc;$i++){
+					$tmpBC = $this.EvalNodeComplex($n.Children[$i], $basePrec, $vars)
+					# promote args to this node precision
+					$tmpBC = $this.EnsureBC($tmpBC,$p)
+					$listArgs.Insert(0,$tmpBC)
+				}
+				$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
+				return $r.CloneWithNewResolution($p)
+			}
+			'op' {
+				$meta = $tmpOps[$n.Name]; if (-not $meta){ throw "Unknown operator '$($n.Name)'" }
+				$argc = [int]$meta['argc']
+				$fn   = [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
+				if ($argc -eq 1) {
+					$a = $this.EnsureBC( ($this.EvalNodeComplex($n.Children[0],$basePrec,$vars)), $p)
+					$r = $fn.InvokeReturnAsIs($a)
+					return $r.CloneWithNewResolution($p)
+				} else {
+					$a = $this.EnsureBC( ($this.EvalNodeComplex($n.Children[0],$basePrec,$vars)), $p)
+					$b = $this.EnsureBC( ($this.EvalNodeComplex($n.Children[1],$basePrec,$vars)), $p)
+					$r = $fn.InvokeReturnAsIs($a,$b)
+					return $r.CloneWithNewResolution($p)
+				}
+			}
+			default { throw "Unknown node kind '$($n.Kind)'" }
+		}
+		throw "Error in EvalNodeComplex : We should not get here"
+		return $null
+	}
+
+	hidden [System.Numerics.BigInteger] NodePrec([System.Numerics.BigInteger]$base,[System.Numerics.BigInteger]$depth,[string]$kind,[string]$name){
+		[System.Numerics.BigInteger] $p = $base + ([BigFormula]::GuardPerLevel * $depth)
+		if ($kind -eq 'op'   -and $this.OpsR.ContainsKey($name) -and $this.OpsR[$name].ContainsKey('resBonus'))
+			{ $p += ($this.OpsR[$name])['resBonus'] }
+		elseif ($kind -eq 'op'   -and $this.OpsC.ContainsKey($name) -and $this.OpsC[$name].ContainsKey('resBonus'))
+			{ $p += ($this.OpsC[$name])['resBonus'] }
+		
+		if ($kind -eq 'func'   -and $this.FuncsR.ContainsKey($name) -and $this.FuncsR[$name].ContainsKey('resBonus'))
+			{ $p += ($this.FuncsR[$name])['resBonus'] }
+		elseif ($kind -eq 'func'   -and $this.FuncsC.ContainsKey($name) -and $this.FuncsC[$name].ContainsKey('resBonus'))
+			{ $p += ($this.FuncsC[$name])['resBonus'] }
+
+		return $p
+	}
+
+	hidden [BigNum] EnsureBN([BigNum] $x, [System.Numerics.BigInteger] $p){
+		if ($x.maxDecimalResolution -ge $p) { return $x.Clone() }
+		return $x.CloneWithNewResolution($p)
+	}
+	hidden [BigComplex] EnsureBC([BigComplex] $z, [System.Numerics.BigInteger] $p){
+		if ($z.GetMaxDecimalResolution() -ge $p) { return $z.Clone() }
+		return $z.CloneWithNewResolution($p)
+	}
+
+	[BigNum] CalculateR() {
+		return $this.CalculateR(([hashtable]@{}))
+	}
+
+	[BigNum] CalculateR([hashtable] $vars = @{}) {
+		$root = $this.BuildAstFromRpn($false)
+		$res  = $this.EvalNodeReal($root, $this.GetWorkResolution(), $vars)
+		return $res.CloneAndRoundWithNewResolution($this.targetResolution)
+	}
+
+    # [BigNum] OldStaticResCalculate([hashtable] $vars = @{}) {
+	# 	$stack = New-Object System.Collections.Generic.Stack[BigNum]
+
+	# 	foreach ($node in $this.Rpn) {
+	# 		switch ($node.kind) {
+	# 			'num' {
+	# 				$stack.Push($node.value.CloneWithNewResolution($this.GetWorkResolution()))
+	# 			}
+
+	# 			'sym' {
+	# 				$name = $node.name
+	# 				if ($this.ConstsR.ContainsKey($name)) {
+	# 					$stack.Push($this.ConstsR[$name].CloneWithNewResolution($this.GetWorkResolution()))
+	# 				}
+	# 				elseif ($vars.ContainsKey($name)) {
+	# 					$v = $vars[$name]
+	# 					if ($v -is [BigNum]) { $stack.Push($v.CloneWithNewResolution($this.GetWorkResolution())) }
+	# 					else { $stack.Push([BigNum]::new($v).CloneWithNewResolution($this.GetWorkResolution())) }
+	# 				}
+	# 				else {
+	# 					throw "Unknown symbol '$name'. Provide it via Calculate parameter (vars)."
+	# 				}
+	# 			}
+
+	# 			'op' {
+	# 				$op   = $node.value
+	# 				$meta = $this.OpsR[$op]
+	# 				if (-not $meta) { throw "Unknown operator '$op'." }
+
+	# 				$argc = [int]$meta['argc']
+	# 				$fn   =      [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
+
+	# 				if ($argc -eq 1) {
+	# 					$a = $stack.Pop()
+	# 					$r = $fn.InvokeReturnAsIs($a)
+	# 					$stack.Push([BigNum]$r)
+	# 				}
+	# 				else {
+	# 					$b = $stack.Pop()
+	# 					$a = $stack.Pop()
+	# 					$r = $fn.InvokeReturnAsIs($a, $b)
+	# 					$stack.Push([BigNum]$r)
+	# 				}
+	# 			}
+
+	# 			'func' {
+	# 				$fmeta = $this.FuncsR[$node.name]
+	# 				if (-not $fmeta) { throw "Unknown function '$($node.name)'." }
+
+	# 				$argc = [int]$fmeta['argc']
+	# 				$fn   =      [scriptblock]$fmeta['fn']
+
+	# 				# gather listArgs in correct order (left-to-right)
+	# 				$listArgs = New-Object System.Collections.Generic.List[BigNum]
+	# 				for ($i=0; $i -lt $argc; $i++) { $listArgs.Insert(0, $stack.Pop()) }
+
+	# 				$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
+	# 				$stack.Push([BigNum]$r)
+	# 			}
+
+	# 			default { throw "Bad RPN node kind '$($node.kind)'" }
+	# 		}
+	# 	}
+
+	# 	if ($stack.Count -ne 1) {
+	# 		throw "Evaluation error: stack has $($stack.Count) values."
+	# 	}
+	# 	return $stack.Pop().CloneAndRoundWithNewResolution($this.targetResolution)
+	# }
+
+	[BigComplex] Calculate() {
+		return $this.Calculate(([hashtable]@{}))
+	}
+
+	[BigComplex] Calculate([hashtable] $vars = @{}) {
+		$root = $this.BuildAstFromRpn($true)
+		$res  = $this.EvalNodeComplex($root, $this.GetWorkResolution(), $vars)
+		return $res.CloneAndRoundWithNewResolution($this.targetResolution)
+	}
+
+	# [BigComplex] OldStaticResCalculateC([hashtable] $vars = @{}) {
+	# 	# normalize variables into BigComplex
+	# 	$env = @{}
+
+	# 	foreach ($k in $vars.Keys) {
+	# 		$v = $vars[$k]
+	# 		if ($v -is [BigComplex])      { $env[$k] = $v }
+	# 		elseif ($v -is [BigNum])       { $env[$k] = [BigComplex]::new($v, [BigNum]::new(0)) }
+	# 		elseif ($v -is [double] -or $v -is [decimal] -or $v -is [int] -or $v -is [long]) {
+	# 			$env[$k] = [BigComplex]::new([BigNum]::new([string]$v), [BigNum]::new(0))
+	# 		} else {
+	# 			throw "Unknown variable type for '$k'."
+	# 		}
+	# 	}
+
+	# 	$stack = [System.Collections.Generic.Stack[BigComplex]]::new()
+
+	# 	foreach ($node in $this.Rpn) {
+	# 		switch ($node.kind) {
+	# 			'num' {
+	# 				# number literal → promote to complex (imag = 0)
+	# 				$stack.Push([BigComplex]::new($node.value, 0))
+	# 			}
+	# 			'sym' {
+	# 				$name = [string]$node.name
+	# 				# 1) variables override
+	# 				if ($env.ContainsKey($name)) {
+	# 					$stack.Push($env[$name]); continue
+	# 				}
+	# 				# 2) constants
+	# 				if ($this.ConstsC.ContainsKey($name)) {
+	# 					$stack.Push($this.ConstsC[$name]); continue
+	# 				}
+	# 				throw "Unknown symbol '$name'."
+	# 			}
+	# 			'func' {
+	# 				$fmeta = $this.FuncsC[$node.name]
+	# 				if (-not $fmeta) { throw "Unknown function '$($node.name)'." }
+
+	# 				$argc = [int]$fmeta['argc']
+	# 				$fn   =      [scriptblock]$fmeta['fn']
+	# 				# gather listArgs in correct order (left-to-right)
+	# 				$listArgs = New-Object System.Collections.Generic.List[BigComplex]
+	# 				for ($i=0; $i -lt $argc; $i++) { $listArgs.Insert(0, $stack.Pop()) }
+	# 				$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
+	# 				$stack.Push([BigComplex]$r)
+	# 			}
+	# 			'op' {
+	# 				$op   = $node.value
+	# 				$meta = $this.OpsC[$op]
+	# 				if (-not $meta) { throw "Unknown operator '$op'." }
+
+	# 				$argc = [int]$meta['argc']
+	# 				$fn   =      [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
+
+	# 				if ($argc -eq 1) {
+	# 					$a = $stack.Pop()
+	# 					$r = $fn.InvokeReturnAsIs($a)
+	# 					$stack.Push([BigComplex]$r)
+	# 				}
+	# 				else {
+	# 					$b = $stack.Pop()
+	# 					$a = $stack.Pop()
+	# 					$r = $fn.InvokeReturnAsIs($a, $b)
+	# 					$stack.Push([BigComplex]$r)
+	# 				}
+	# 			}
+	# 			default { throw "Unknown RPN node kind '$($node.kind)'." }
+	# 		}
+	# 	}
+	# 	if ($stack.Count -ne 1) { throw "Malformed RPN; stack ended with $($stack.Count) item(s)." }
+	# 	return $stack.Pop()
+	# }
+
+	#endregion Calculate method and helpers
+
 
 	#region ToString method and helpers
 
@@ -324,10 +724,14 @@ class BigFormula : System.IFormattable {
 					$stack.Push(@{ s = $node.value.ToString($format,$provider); prec = 100 })
 				}
 				'sym' {
-					$stack.Push(@{ s = [string]$node.name; prec = 100 })
+					if($node.name -eq "i") {
+						$stack.Push(@{ s = [BigFormula]::iChar; prec = 100 })
+					}else{
+						$stack.Push(@{ s = [string]$node.name; prec = 100 })
+					}
 				}
 				'func' {
-					$fmeta = $this.Funcs[$node.name]
+					$fmeta = $this.FuncsR[$node.name]
 					if (-not $fmeta) { throw "Unknown function '$($node.name)' in ToString()." }
 					$argc = [int]$fmeta['argc']
 					if ($argc -lt 0) { throw "Function '$($node.name)' must have fixed argc for pretty-print." }
@@ -341,7 +745,7 @@ class BigFormula : System.IFormattable {
 				}
 				'op' {
 					$op   = [string]$node.value
-					$meta = $this.TSHOpMeta($op,$this.Ops)
+					$meta = $this.TSHOpMeta($op,$this.OpsR)
 					$argc = [int]$meta['argc']
 					$prec = [int]$meta['prec']
 					$assoc= [string]$meta['assoc']
@@ -442,6 +846,19 @@ class BigFormula : System.IFormattable {
 	}
 
 	#endregion ToString method and helpers
+}
+
+class BfNode {
+    [string] $Kind   # 'num' | 'sym' | 'op' | 'func'
+    [string] $Name   # operator symbol, func name, or variable name
+    $Value           # BigNum literal (for 'num'), otherwise $null
+    [System.Collections.Generic.List[BfNode]] $Children
+    [int] $Depth
+    BfNode([string]$kind,[string]$name,$value){
+        $this.Kind = $kind; $this.Name = $name; $this.Value = $value
+        $this.Children = [System.Collections.Generic.List[BfNode]]::new()
+        $this.Depth = 0
+    }
 }
 
 class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[object] {
