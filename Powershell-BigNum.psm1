@@ -2,7 +2,7 @@
 #region Classes
 
 class BigFormula : System.IFormattable {
-    hidden[string]                               $Source
+    hidden [string]                              $sourceExpr
     hidden [System.Numerics.BigInteger]          $targetResolution
 	hidden static [System.Numerics.BigInteger]   $defaultTargetResolution = 100
     hidden [object[]]                            $Rpn                # output of parsing (Reverse Polish Notation)
@@ -20,8 +20,30 @@ class BigFormula : System.IFormattable {
 		$this.Init($expr,[BigFormula]::defaultTargetResolution)
 	}
 
+	BigFormula([BigFormula] $bigFormula) {
+		$this.sourceExpr = $bigFormula.sourceExpr.Clone()
+		$this.targetResolution = [System.Numerics.BigInteger]::parse($bigFormula.targetResolution)
+		$this.Rpn = $bigFormula.Rpn.Clone()
+		$this.Ops = $bigFormula.Ops.Clone()
+		$this.Funcs = $bigFormula.Funcs.Clone()
+		$this.Consts = $bigFormula.Consts.Clone()
+		$this.rxNumber = ([regex]($bigFormula.rxNumber.ToString()))
+		$this.rxIdent = ([regex]($bigFormula.rxIdent.ToString()))
+	}
+
+	BigFormula([BigFormula] $bigFormula, [System.Numerics.BigInteger] $newResolution) {
+		$this.sourceExpr = $bigFormula.sourceExpr.Clone()
+		$this.targetResolution = [System.Numerics.BigInteger]::parse($newResolution)
+		$this.Rpn = $bigFormula.Rpn.Clone()
+		$this.Ops = $bigFormula.Ops.Clone()
+		$this.Funcs = $bigFormula.Funcs.Clone()
+		$this.Consts = $bigFormula.Consts.Clone()
+		$this.rxNumber = ([regex]($bigFormula.rxNumber.ToString()))
+		$this.rxIdent = ([regex]($bigFormula.rxIdent.ToString()))
+	}
+
 	hidden [void] Init([string]$expr,[System.Numerics.BigInteger] $resolution) {
-		$this.Source     = $expr
+		$this.sourceExpr     = $expr
         $this.targetResolution = $resolution
 
         # --- Operators: precedence (higher wins) & associativity
@@ -36,7 +58,6 @@ class BigFormula : System.IFormattable {
         }
 
         # --- Functions (fixed arity for simplicity)
-        $res = [System.Numerics.BigInteger]$this.targetResolution
         $this.Funcs = @{
             'sin'   = @{ argc = 1; fn = { param($x) [BigNum]::Sin($x) } }
             'cos'   = @{ argc = 1; fn = { param($x) [BigNum]::Cos($x) } }
@@ -50,16 +71,28 @@ class BigFormula : System.IFormattable {
 
         # --- Constants (built once per instance at requested precision)
         $this.Consts = @{
-            'pi'  = [BigNum]::Pi($res)
-            'tau' = [BigNum]::Tau($res)
-            'e'   = [BigNum]::Exp([BigNum]::new(1).CloneWithNewResolution($res))
+            'pi'  = [BigNum]::Pi($this.GetWorkResolution())
+            'tau' = [BigNum]::Tau($this.GetWorkResolution())
+            'e'   = [BigNum]::e($this.GetWorkResolution())
         }
 
         $this.Rpn = $this.ParseToRpn($expr)
 	}
 
+	[BigFormula] CloneWithNewTargetResolution([System.Numerics.BigInteger] $newResolution) {
+		return [BigFormula]::new($this,$newResolution)
+	}
+
+	[BigFormula] Clone() {
+		return [BigFormula]::new($this)
+	}
+
 	[System.Numerics.BigInteger] GetTargetResolution() {
 		return $this.targetResolution
+	}
+
+	hidden [System.Numerics.BigInteger] GetWorkResolution() {
+		return $this.targetResolution + 10
 	}
 
     hidden [object[]] ParseToRpn([string] $expr) {
@@ -78,7 +111,7 @@ class BigFormula : System.IFormattable {
         for ($i=0; $i -lt $tokens.Count; $i++) {
             $t = $tokens[$i]
             switch ($t.kind) {
-                'number' { $out.Add(@{ kind='num'; value=[BigNum]::new($t.value).CloneWithNewResolution($this.targetResolution) }); $expectUnary = $false }
+                'number' { $out.Add(@{ kind='num'; value=[BigNum]::new($t.value) }); $expectUnary = $false }
                 'ident'  {
                     # function or variable/constant?
                     if ($i+1 -lt $tokens.Count -and $tokens[$i+1].kind -eq 'lparen') {
@@ -190,26 +223,25 @@ class BigFormula : System.IFormattable {
 
     [BigNum] Calculate([hashtable] $vars = @{}) {
 		$stack = New-Object System.Collections.Generic.Stack[BigNum]
-		[System.Numerics.BigInteger]$res = [System.Numerics.BigInteger]$this.targetResolution
 
 		foreach ($node in $this.Rpn) {
 			switch ($node.kind) {
 				'num' {
-					$stack.Push($node.value.CloneWithNewResolution($res))
+					$stack.Push($node.value.CloneWithNewResolution($this.GetWorkResolution()))
 				}
 
 				'sym' {
 					$name = $node.name
 					if ($this.Consts.ContainsKey($name)) {
-						$stack.Push($this.Consts[$name].CloneWithNewResolution($res))
+						$stack.Push($this.Consts[$name].CloneWithNewResolution($this.GetWorkResolution()))
 					}
 					elseif ($vars.ContainsKey($name)) {
 						$v = $vars[$name]
-						if ($v -is [BigNum]) { $stack.Push($v.CloneWithNewResolution($res)) }
-						else { $stack.Push([BigNum]::new($v).CloneWithNewResolution($res)) }
+						if ($v -is [BigNum]) { $stack.Push($v.CloneWithNewResolution($this.GetWorkResolution())) }
+						else { $stack.Push([BigNum]::new($v).CloneWithNewResolution($this.GetWorkResolution())) }
 					}
 					else {
-						throw "Unknown symbol '$name'. Provide it via -vars."
+						throw "Unknown symbol '$name'. Provide it via Calculate parameter (vars)."
 					}
 				}
 
@@ -256,7 +288,7 @@ class BigFormula : System.IFormattable {
 		if ($stack.Count -ne 1) {
 			throw "Evaluation error: stack has $($stack.Count) values."
 		}
-		return $stack.Pop().CloneAndRoundWithNewResolution($res)
+		return $stack.Pop().CloneAndRoundWithNewResolution($this.targetResolution)
 	}
 
 	#region ToString method and helpers
