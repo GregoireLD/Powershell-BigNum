@@ -110,11 +110,11 @@ $c = [BigNum]::c()        # Speed of light (exact)
 
 ```powershell
 $formula1 = [BigFormula]"42! + sqrt(8.5)"           # New Formula with default decimal precision output
-$formula1.Calculate()                               # Calculate formula1 with no extra parameters
-$formula1.CalculateR()                              # Calculate formula1 but restricted to real numbers and functions
+$formula1.Evaluate()                                # Compute formula1 with no extra parameters
+$formula1.EvaluateR()                               # Compute formula1 but restricted to real numbers and functions
 $formula1                                           # Display the formula, rebuilt from the internal representation
 $formula2 = [BigFormula]::new("x! + sqrt(y)", 10)   # New Formula with two variables and 10 decimal precision output
-$formula2.Calculate(@{x = 25; y = "15.007"})        # Calculate formula2 with x and y as auto-casted BigNum extra parameters
+$formula2.Evaluate(@{x = 25; y = "15.007"})         # Compute formula2 with x and y as auto-casted BigNum extra parameters
 $formula3 = [BigFormula]"2exp(3i*Tau/2)"            # New Formula with implicit multiplications
 $formula3                                           # Display the formula and reveal implicit multiplications
 ```

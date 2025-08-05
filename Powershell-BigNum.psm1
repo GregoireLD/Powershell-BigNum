@@ -338,7 +338,7 @@ class BigFormula : System.IFormattable {
 		)
 	}
 
-	#region Calculate method and helpers
+	#region Evaluate methods and helpers
 
 	hidden [BfNode] BuildAstFromRpn([bool] $complexMode) {
 		$tmpOps   = $complexMode ? $this.OpsC   : $this.OpsR
@@ -524,11 +524,11 @@ class BigFormula : System.IFormattable {
 		return $z.CloneWithNewResolution($p)
 	}
 
-	[BigNum] CalculateR() {
-		return $this.CalculateR(([hashtable]@{}))
+	[BigNum] EvaluateR() {
+		return $this.EvaluateR(([hashtable]@{}))
 	}
 
-	[BigNum] CalculateR([hashtable] $vars = @{}) {
+	[BigNum] EvaluateR([hashtable] $vars = @{}) {
 		$root = $this.BuildAstFromRpn($false)
 		$res  = $this.EvalNodeReal($root, $this.GetWorkResolution(), $vars)
 		return $res.CloneAndRoundWithNewResolution($this.targetResolution)
@@ -604,11 +604,11 @@ class BigFormula : System.IFormattable {
 	# 	return $stack.Pop().CloneAndRoundWithNewResolution($this.targetResolution)
 	# }
 
-	[BigComplex] Calculate() {
-		return $this.Calculate(([hashtable]@{}))
+	[BigComplex] Evaluate() {
+		return $this.Evaluate(([hashtable]@{}))
 	}
 
-	[BigComplex] Calculate([hashtable] $vars = @{}) {
+	[BigComplex] Evaluate([hashtable] $vars = @{}) {
 		$root = $this.BuildAstFromRpn($true)
 		$res  = $this.EvalNodeComplex($root, $this.GetWorkResolution(), $vars)
 		return $res.CloneAndRoundWithNewResolution($this.targetResolution)
@@ -688,7 +688,7 @@ class BigFormula : System.IFormattable {
 	# 	return $stack.Pop()
 	# }
 
-	#endregion Calculate method and helpers
+	#endregion Evaluate methods and helpers
 
 
 	#region ToString method and helpers
