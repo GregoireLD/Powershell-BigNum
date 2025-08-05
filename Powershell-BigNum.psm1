@@ -64,26 +64,26 @@ class BigFormula : System.IFormattable {
 
         # --- Real Operators: precedence (higher wins) & associativity
         $this.OpsR = @{
-            '+' = @{ prec = 2; assoc = 'L'; argc = 2; resBonus =  0 ; type = 'op'; fn = { param($a,$b)  $a + $b } }
-            '-' = @{ prec = 2; assoc = 'L'; argc = 2; resBonus =  0 ; type = 'op'; fn = { param($a,$b)  $a - $b } }
-			'%' = @{ prec = 3; assoc = 'L'; argc = 2; resBonus =  2 ; type = 'op'; fn = { param($a,$b)  $a % $b } }
-            '*' = @{ prec = 3; assoc = 'L'; argc = 2; resBonus =  2 ; type = 'op'; fn = { param($a,$b)  $a * $b } }
-            '/' = @{ prec = 3; assoc = 'L'; argc = 2; resBonus =  6 ; type = 'op'; fn = { param($a,$b)  $a / $b } }
-            '^' = @{ prec = 4; assoc = 'R'; argc = 2; resBonus = 10 ; type = 'op'; fn = { param($a,$b)  [BigNum]::Pow($a, $b) } }
-            'u-'= @{ prec = 5; assoc = 'R'; argc = 1; resBonus =  2 ; type = 'op'; fn = { param($a)     -$a } } # unary minus
-            '!' = @{ prec = 6; assoc = 'L'; argc = 1; resBonus =  8 ; type = 'postfix'; fn = { param($a)  [BigNum]::Gamma($a + 1).CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } }
+            '+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
+            '-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
+			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
+            '*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
+            '/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
+            '^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  [BigNum]::Pow($a, $b) } }
+            'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } } # unary minus
+            '!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigNum]::Gamma($a + 1).CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } }
         }
 
 		# --- Complex Operators: precedence (higher wins) & associativity. (use your BigComplex arithmetic)
 		$this.OpsC = @{
-			'+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; type = 'op'; fn = { param($a,$b)  $a + $b } }
-			'-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; type = 'op'; fn = { param($a,$b)  $a - $b } }
-			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; type = 'op'; fn = { param($a,$b)  $a % $b } }
-			'*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; type = 'op'; fn = { param($a,$b)  $a * $b } }
-			'/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; type = 'op'; fn = { param($a,$b)  $a / $b } }
-			'^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; type = 'op'; fn = { param($a,$b)  [BigComplex]::Pow($a,$b) } }
-			'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; type = 'op'; fn = { param($a)     -$a } }  # unary minus
-			'!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; type = 'postfix'; fn = { param($a)  [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } } # factorial → Γ(z+1)
+			'+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
+			'-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
+			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
+			'*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
+			'/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
+			'^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  [BigComplex]::Pow($a,$b) } }
+			'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } }  # unary minus
+			'!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } } # factorial → Γ(z+1)
 		}
 
 
@@ -561,7 +561,7 @@ class BigFormula : System.IFormattable {
 					$v = $vars[$n.Name]
 					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
 					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
-					return $this.EnsureBC([BigComplex]::new([BigNum]$v),$p)
+					return $this.EnsureBC([BigComplex]::new([BigComplex]$v),$p)
 					# throw "Variable '$($n.Name)' must be BigNum or BigComplex."
 				}
 				if ($tmpConst.ContainsKey($n.Name)) { return $this.EnsureBC($tmpConst[$n.Name], $p) }
@@ -891,7 +891,7 @@ class BigFormula : System.IFormattable {
 		return ($stack.Pop().s)
 	}
 
-	hidden [System.Object] TSHOpMeta ([string]$op, [hashtable]$ops) {
+	hidden [System.Object] TSHOpMeta([string]$op, [hashtable]$ops) {
 		$m = $ops[$op]
 		if (-not $m) { $m = @{} }
 
