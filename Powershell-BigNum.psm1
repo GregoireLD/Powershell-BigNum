@@ -83,7 +83,7 @@ class BigFormula : System.IFormattable {
 			'/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
 			'^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  [BigComplex]::Pow($a,$b) } }
 			'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } }  # unary minus
-			'!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } } # factorial → Γ(z+1)
+			'!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } } # factorial -> Gamma(z+1)
 		}
 
 
@@ -184,7 +184,7 @@ class BigFormula : System.IFormattable {
             'e'   = [BigNum]::e($this.GetWorkResolution())
         }
 
-		# --- Complex Constants (note both 'i' and 𝑖)
+		# --- Complex Constants (note both 'i' and "Unicode U+1D456 "Mathematical Italic Small i")
 		$this.ConstsC = @{
 			'Pi' = [BigComplex]::new([BigNum]::Pi($this.GetWorkResolution()), [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
 			'Tau'= [BigComplex]::new([BigNum]::Tau($this.GetWorkResolution()), [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
@@ -233,7 +233,7 @@ class BigFormula : System.IFormattable {
                 'ident'  {
                     # function or variable/constant?
                     if ($i+1 -lt $tokens.Count -and $tokens[$i+1].kind -eq 'lparen') {
-                        # function call marker — push ident to stack
+                        # function call marker - push ident to stack
                         $stack.Push(@{ kind='func'; name=$t.value })
                     } else {
                         # variable or constant -> output now
@@ -347,7 +347,7 @@ class BigFormula : System.IFormattable {
 		function EndsValue([hashtable] $t) {
 			switch ($t.kind) {
 				'number' { return $true }
-				'ident'  { return $true }   # variable/constant; function name still counts as a “value starter” for the next token
+				'ident'  { return $true }   # variable/constant; function name still counts as a "value starter" for the next token
 				'rparen' { return $true }
 				'postfix'{ return $true }   # factorial '!'
 				default  { return $false }
@@ -636,76 +636,6 @@ class BigFormula : System.IFormattable {
 		return $res.CloneAndRoundWithNewResolution($this.targetResolution)
 	}
 
-    # [BigNum] OldStaticResCalculate([hashtable] $vars = @{}) {
-	# 	$stack = New-Object System.Collections.Generic.Stack[BigNum]
-
-	# 	foreach ($node in $this.Rpn) {
-	# 		switch ($node.kind) {
-	# 			'num' {
-	# 				$stack.Push($node.value.CloneWithNewResolution($this.GetWorkResolution()))
-	# 			}
-
-	# 			'sym' {
-	# 				$name = $node.name
-	# 				if ($this.ConstsR.ContainsKey($name)) {
-	# 					$stack.Push($this.ConstsR[$name].CloneWithNewResolution($this.GetWorkResolution()))
-	# 				}
-	# 				elseif ($vars.ContainsKey($name)) {
-	# 					$v = $vars[$name]
-	# 					if ($v -is [BigNum]) { $stack.Push($v.CloneWithNewResolution($this.GetWorkResolution())) }
-	# 					else { $stack.Push([BigNum]::new($v).CloneWithNewResolution($this.GetWorkResolution())) }
-	# 				}
-	# 				else {
-	# 					throw "Unknown symbol '$name'. Provide it via Calculate parameter (vars)."
-	# 				}
-	# 			}
-
-	# 			'op' {
-	# 				$op   = $node.value
-	# 				$meta = $this.OpsR[$op]
-	# 				if (-not $meta) { throw "Unknown operator '$op'." }
-
-	# 				$argc = [int]$meta['argc']
-	# 				$fn   =      [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
-
-	# 				if ($argc -eq 1) {
-	# 					$a = $stack.Pop()
-	# 					$r = $fn.InvokeReturnAsIs($a)
-	# 					$stack.Push([BigNum]$r)
-	# 				}
-	# 				else {
-	# 					$b = $stack.Pop()
-	# 					$a = $stack.Pop()
-	# 					$r = $fn.InvokeReturnAsIs($a, $b)
-	# 					$stack.Push([BigNum]$r)
-	# 				}
-	# 			}
-
-	# 			'func' {
-	# 				$fmeta = $this.FuncsR[$node.name]
-	# 				if (-not $fmeta) { throw "Unknown function '$($node.name)'." }
-
-	# 				$argc = [int]$fmeta['argc']
-	# 				$fn   =      [scriptblock]$fmeta['fn']
-
-	# 				# gather listArgs in correct order (left-to-right)
-	# 				$listArgs = New-Object System.Collections.Generic.List[BigNum]
-	# 				for ($i=0; $i -lt $argc; $i++) { $listArgs.Insert(0, $stack.Pop()) }
-
-	# 				$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
-	# 				$stack.Push([BigNum]$r)
-	# 			}
-
-	# 			default { throw "Bad RPN node kind '$($node.kind)'" }
-	# 		}
-	# 	}
-
-	# 	if ($stack.Count -ne 1) {
-	# 		throw "Evaluation error: stack has $($stack.Count) values."
-	# 	}
-	# 	return $stack.Pop().CloneAndRoundWithNewResolution($this.targetResolution)
-	# }
-
 	[BigComplex] Evaluate() {
 		return $this.Evaluate(([hashtable]@{}))
 	}
@@ -715,80 +645,6 @@ class BigFormula : System.IFormattable {
 		$res  = $this.EvalNodeComplex($root, $this.GetWorkResolution(), $vars)
 		return $res.CloneAndRoundWithNewResolution($this.targetResolution)
 	}
-
-	# [BigComplex] OldStaticResCalculateC([hashtable] $vars = @{}) {
-	# 	# normalize variables into BigComplex
-	# 	$env = @{}
-
-	# 	foreach ($k in $vars.Keys) {
-	# 		$v = $vars[$k]
-	# 		if ($v -is [BigComplex])      { $env[$k] = $v }
-	# 		elseif ($v -is [BigNum])       { $env[$k] = [BigComplex]::new($v, [BigNum]::new(0)) }
-	# 		elseif ($v -is [double] -or $v -is [decimal] -or $v -is [int] -or $v -is [long]) {
-	# 			$env[$k] = [BigComplex]::new([BigNum]::new([string]$v), [BigNum]::new(0))
-	# 		} else {
-	# 			throw "Unknown variable type for '$k'."
-	# 		}
-	# 	}
-
-	# 	$stack = [System.Collections.Generic.Stack[BigComplex]]::new()
-
-	# 	foreach ($node in $this.Rpn) {
-	# 		switch ($node.kind) {
-	# 			'num' {
-	# 				# number literal → promote to complex (imag = 0)
-	# 				$stack.Push([BigComplex]::new($node.value, 0))
-	# 			}
-	# 			'sym' {
-	# 				$name = [string]$node.name
-	# 				# 1) variables override
-	# 				if ($env.ContainsKey($name)) {
-	# 					$stack.Push($env[$name]); continue
-	# 				}
-	# 				# 2) constants
-	# 				if ($this.ConstsC.ContainsKey($name)) {
-	# 					$stack.Push($this.ConstsC[$name]); continue
-	# 				}
-	# 				throw "Unknown symbol '$name'."
-	# 			}
-	# 			'func' {
-	# 				$fmeta = $this.FuncsC[$node.name]
-	# 				if (-not $fmeta) { throw "Unknown function '$($node.name)'." }
-
-	# 				$argc = [int]$fmeta['argc']
-	# 				$fn   =      [scriptblock]$fmeta['fn']
-	# 				# gather listArgs in correct order (left-to-right)
-	# 				$listArgs = New-Object System.Collections.Generic.List[BigComplex]
-	# 				for ($i=0; $i -lt $argc; $i++) { $listArgs.Insert(0, $stack.Pop()) }
-	# 				$r = $fn.InvokeReturnAsIs(@($listArgs.ToArray()))
-	# 				$stack.Push([BigComplex]$r)
-	# 			}
-	# 			'op' {
-	# 				$op   = $node.value
-	# 				$meta = $this.OpsC[$op]
-	# 				if (-not $meta) { throw "Unknown operator '$op'." }
-
-	# 				$argc = [int]$meta['argc']
-	# 				$fn   =      [scriptblock]$meta['fn']   # get ScriptBlock from hashtable
-
-	# 				if ($argc -eq 1) {
-	# 					$a = $stack.Pop()
-	# 					$r = $fn.InvokeReturnAsIs($a)
-	# 					$stack.Push([BigComplex]$r)
-	# 				}
-	# 				else {
-	# 					$b = $stack.Pop()
-	# 					$a = $stack.Pop()
-	# 					$r = $fn.InvokeReturnAsIs($a, $b)
-	# 					$stack.Push([BigComplex]$r)
-	# 				}
-	# 			}
-	# 			default { throw "Unknown RPN node kind '$($node.kind)'." }
-	# 		}
-	# 	}
-	# 	if ($stack.Count -ne 1) { throw "Malformed RPN; stack ended with $($stack.Count) item(s)." }
-	# 	return $stack.Pop()
-	# }
 
 	#endregion Evaluate methods and helpers
 
@@ -1400,27 +1256,6 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $tmpResult.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
-	# # op_LeftShift : Standard overload for the "<<" operator.
-	# static [BigNum] op_LeftShift([BigNum] $a, [System.Numerics.BigInteger] $b) {
-	# 	[System.Numerics.BigInteger]$tmpA = $a.integerVal
-	# 	[System.Numerics.BigInteger]$newShiftVal = $a.shiftVal - $b
-
-	# 	if ($newShiftVal -lt 0) {
-	# 		$tmpA *= [BigNum]::PowTenPositive(-$newShiftVal)
-	# 		$newShiftVal=0
-	# 	}
-
-	# 	return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.GetMaxDecimalResolution())
-	# }
-
-	# # op_LeftShift : Standard overload for the ">>" operator.
-	# static [BigNum] op_RightShift([BigNum] $a, [System.Numerics.BigInteger] $b) {
-	# 	[System.Numerics.BigInteger]$tmpA = $a.integerVal
-	# 	[System.Numerics.BigInteger]$newShiftVal = $a.shiftVal + $b
-
-	# 	return [BigNum]::new($tmpA,$newShiftVal,$a.negativeFlag,$a.GetMaxDecimalResolution())
-	# }
-
 	# -bxor   op_ExclusiveOr
 	# -band   op_BitwiseAnd
 	# -bor    op_BitwiseOr
@@ -1657,7 +1492,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			return (([BigComplex]1) / $posRoot).CloneAndRoundWithNewResolution($targetResolution)
 		}
 
-		# Convert z to polar form: z = r * e^(iθ)
+		# Convert z to polar form: z = r * e^(i*Theta)
 		[BigNum] $tmpMagnitude = $tmpValue.Magnitude()
 		[BigNum] $tmpArg = $tmpValue.Arg()
 
@@ -1665,7 +1500,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		[BigNum] $rootMagnitude = [BigNum]::NthRootInt($n, $tmpMagnitude)
 		[BigNum] $angle = $tmpArg / ([BigNum]::new($n).CloneWithNewResolution($workResolution))
 
-		# Reconstruct root using Euler's formula: r^(1/n) * (cos(θ/n) + i·sin(θ/n))
+		# Reconstruct root using Euler's formula: r^(1/n) * (cos(Theta/n) + i*sin(Theta/n))
 		[BigNum] $tmpRealPart = $rootMagnitude * [BigNum]::Cos($angle)
 		[BigNum] $tmpImagPart = $rootMagnitude * [BigNum]::Sin($angle)
 
@@ -1696,7 +1531,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# Gamma : Compute the value of the Gamma function for z.
 	static [BigComplex] Gamma([BigComplex] $z){
-		# integers ≤ 0  →  poles
+		# integers -le 0  ->  poles
 		if ($z.IsPureReal() -and $z.IsInteger() -and $z.IsNegative()) {
 			throw "[BigComplex]::Gamma(): pole at negative or null real integer z"
 		}
@@ -1743,13 +1578,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
         [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($workResolution)
 		$coeffs = [BigNum]::BuildAllSpougeCoefficients($selectedA, $workResolution)
 
-		# Series S = c₀ + Σ_{k=1}^{a-1} c_k / (x-1+k)
-        # [BigComplex] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$workResolution)
-        # for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
-        #     [BigComplex] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$workResolution)
-        #     [BigComplex] $den = $tmpZ - 1 + $k
-        #     $S += ($ck / $den)
-        # }
+		# Series S = c0 + SIGMA_{k=1}^{a-1} c_k / (x-1+k)
 		[BigComplex] $S = $coeffs[0]
 		$S = $S.CloneWithNewResolution($workResolution)
 		for ($k=1; $k -lt $selectedA; $k++) {
@@ -2425,7 +2254,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	#region combinatorial functions
 
-	#Pnk : Analytic Permutation. P(n,k) function. n! / (n-k)!.
+	#Pnk : Analytic Permutation. P(n,k) function. n! / (n-k)!.
 	static [BigComplex] Pnk([BigComplex] $n, [BigComplex] $k){
 		if($n.IsInteger() -and $n.IsPureReal() -and ($n -le -1)) {
 			throw "[BigComplex]::Pnk: n cannot be a negative integer (poles)."
@@ -2452,7 +2281,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
-	#Permutation : Classical Permutation. P(n,k) function. n! / (n-k)!.
+	#Permutation : Classical Permutation. P(n,k) function. n! / (n-k)!.
 	static [System.Numerics.BigInteger] Permutation([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
 		if ($n -lt 0) {
 			throw "[BigComplex]::Permutation Error : n must be greater or equal to 0. Use [BigComplex]::Pnk for the full analytic continuation"
@@ -2463,7 +2292,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return [BigNum]::Permutation($n, $k)
 	}
 
-	#Cnk : Analytic Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	#Cnk : Analytic Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
 	static [BigComplex] Cnk([BigComplex] $n, [BigComplex] $k){
 		if($n.IsInteger() -and $n.IsPureReal() -and ($n -le -1)) {
 			throw "[BigComplex]::Cnk: n cannot be a negative integer (poles)."
@@ -2493,7 +2322,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
-	#Combination : Classical Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	#Combination : Classical Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
 	static [System.Numerics.BigInteger] Combination([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
 		if ($n -lt 0) {
 			throw "[BigComplex]::Combination Error : n must be greater or equal to 0. Use [BigComplex]::Cnk for the full analytic continuation"
@@ -2504,7 +2333,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return [BigNum]::Combination($n, $k)
 	}
 
-	#CnkMulti : Analytic Multiset Combination (Multichoose). C(n+k-1, k).
+	#CnkMulti : Analytic Multiset Combination (Multichoose). C(n+k-1, k).
 	static [BigComplex] CnkMulti([BigComplex] $n, [BigComplex] $k){
 		if($n.IsInteger() -and $k.IsInteger() -and $n.IsPureReal() -and $k.IsPureReal()) {
 			return ([BigComplex]([BigComplex]::CombinationMulti($n.realPart.Int(),$k.realPart.Int())))
@@ -2519,7 +2348,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
-	#CombinationMulti : Classical Multiset Combination (Multichoose). C(n+k-1, k).
+	#CombinationMulti : Classical Multiset Combination (Multichoose). C(n+k-1, k).
 	static [System.Numerics.BigInteger] CombinationMulti([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
 		return [BigNum]::CombinationMulti($n, $k)
 	}
@@ -3739,12 +3568,12 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return ([BigNum]([BigNum]::FactorialInt($value.Int()))).CloneAndRoundWithNewResolution($targetResolution)
 	}
 
-	# FactorialInt : INTERNAL USE. Compute the Factorial of a BigInteger using the Split‑Recursive method.
+	# FactorialInt : INTERNAL USE. Compute the Factorial of a BigInteger using the Split-Recursive method.
 	hidden static [System.Numerics.BigInteger] FactorialInt( [System.Numerics.BigInteger] $value){
 		return ([BigNum]::FactorialIntMulRange(2, $value))
 	}
 
-	# FactorialIntMulRange : INTERNAL USE. Compute the Factorial using the Split‑Recursive method.
+	# FactorialIntMulRange : INTERNAL USE. Compute the Factorial using the Split-Recursive method.
 	hidden static [System.Numerics.BigInteger] FactorialIntMulRange( [System.Numerics.BigInteger] $lo, [System.Numerics.BigInteger] $hi){
 		[int] $cutoff = 64
 		if ($hi -lt $lo) { return [System.Numerics.BigInteger]::One }
@@ -3798,7 +3627,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		
 		[BigNum] $sinPiZ = [BigNum]::Sin($constPi * $tmpZ)
 		if ($sinPiZ.IsNull()) {
-			# This would mean z is (near) an integer where sin(πz)=0 → pole handled above.
+			# This would mean z is (near) an integer where sin(Pi*z)=0 -> pole handled above.
 			throw "[BigNum]::Gamma(): Sin(Pi*Z)=0 encountered (pole)."
 		}
 
@@ -3835,7 +3664,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		
 		[BigNum] $sinPiZ = [BigNum]::Sin($constPi * $tmpZ)
 		if ($sinPiZ.IsNull()) {
-			# This would mean z is (near) an integer where sin(πz)=0 → pole handled above.
+			# This would mean z is (near) an integer where sin(Pi*z)=0 -> pole handled above.
 			throw "[BigNum]::LnGamma(): Sin(Pi*Z)=0 encountered (pole)."
 		}
 
@@ -3864,13 +3693,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
         [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($workResolution)
 		$coeffs = [BigNum]::BuildAllSpougeCoefficients($selectedA, $workResolution)
 
-		# Series S = c₀ + Σ_{k=1}^{a-1} c_k / (x-1+k)
-        # [BigNum] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$workResolution)
-        # for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
-        #     [BigNum] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$workResolution)
-        #     [BigNum] $den  = $z - 1 + $k
-        #     $S += ($ck / $den)
-        # }
+		# Series S = c0 + SIGMA_{k=1}^{a-1} c_k / (x-1+k)
 		[BigNum] $S = $coeffs[0]
 		$S = $S.CloneWithNewResolution($workResolution)
 		for ($k=1; $k -lt $selectedA; $k++) {
@@ -3906,7 +3729,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($workResolution)
 		[BigNum] $constTau = [BigNum]::Tau($workResolution)
 		
-		# Preliminary: reduce x to [-π, π] range
+		# Preliminary: reduce x to [-Pi, Pi] range
 		[BigNum] $k = ($val / $constTau).Round(0)
 		$term = $val - $k * $constTau
 
@@ -3942,7 +3765,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $constTwo = ([BigNum]"2").CloneWithNewResolution($workResolution)
 		[BigNum] $constTau = [BigNum]::Tau($workResolution)
 
-		# Preliminary: reduce x to [-π, π] range
+		# Preliminary: reduce x to [-Pi, Pi] range
 		[BigNum] $k = ($val / $constTau).Round(0)
 		$x = $val - $k * $constTau
 		$term = $constOne.Clone()
@@ -4052,7 +3875,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Arcsin: Inverse Sine Function.
 	static [BigNum] Arcsin([BigNum] $val) {
 
-		# Arcsin is defined on [−1, 1]
+		# Arcsin is defined on [-1, 1]
 
 		[System.Numerics.BigInteger] $targetResolution = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
@@ -4082,7 +3905,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Arccos: Inverse Cosine Function.
 	static [BigNum] Arccos([BigNum] $val) {
 
-		# Arccos is defined on [−1, 1]
+		# Arccos is defined on [-1, 1]
 
 		[System.Numerics.BigInteger] $targetResolution = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
@@ -4186,7 +4009,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Arccsc: Inverse Cosecant Function.
 	static [BigNum] Arccsc([BigNum] $val) {
 
-		# Arccsc is defined on ]-Inf, −1] U [1, +Inf[
+		# Arccsc is defined on ]-Inf, -1] U [1, +Inf[
 
 		[System.Numerics.BigInteger] $targetResolution = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $workResolution = $targetResolution + 5
@@ -4207,7 +4030,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Arcsec: Inverse Secant Function.
 	static [BigNum] Arcsec([BigNum] $val) {
 
-		# Arcsec is defined on ]-Inf, −1] U [1, +Inf[
+		# Arcsec is defined on ]-Inf, -1] U [1, +Inf[
 
 		[System.Numerics.BigInteger] $targetResolution = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $workResolution = $targetResolution + 5
@@ -4397,7 +4220,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Arctanh: Inverse Hyperbolic Tangent Function.
 	static [BigNum] Arctanh([BigNum] $val) {
 
-		# Arctanh is defined on ]−1, 1[
+		# Arctanh is defined on ]-1, 1[
 
 		[System.Numerics.BigInteger] $targetResolution = $val.maxDecimalResolution
 		[System.Numerics.BigInteger] $workResolution = $targetResolution + 5
@@ -4464,7 +4287,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Arccoth: Inverse Hyperbolic Cotangent Function.
 	static [BigNum] Arccoth([BigNum] $val) {
 
-		# Arccoth is defined on ]-Inf, −1] U [1, +Inf[
+		# Arccoth is defined on ]-Inf, -1] U [1, +Inf[
 
 		if ($val.Abs() -le 1) {
 			throw "Error in [BigNum]::Arccoth : magnitude of val must be greater than 1"
@@ -4487,7 +4310,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	#region combinatorial functions
 
-	#Pnk : Analytic Permutation. P(n,k) function. n! / (n-k)!.
+	#Pnk : Analytic Permutation. P(n,k) function. n! / (n-k)!.
 	static [BigNum] Pnk([BigNum] $n, [BigNum] $k){
 		if($n.IsInteger() -and ($n -le -1)) {
 			throw "[BigNum]::Pnk: n cannot be a negative integer (poles)."
@@ -4514,7 +4337,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
-	#Permutation : Classical Permutation. P(n,k) function. n! / (n-k)!.
+	#Permutation : Classical Permutation. P(n,k) function. n! / (n-k)!.
 	static [System.Numerics.BigInteger] Permutation([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
 		if ($n -lt 0) {
 			throw "[BigNum]::Permutation Error : n must be greater or equal to 0. Use [BigNum]::Pnk for the full analytic continuation"
@@ -4534,7 +4357,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return [BigNum]::FactorialIntMulRange($lo, $hi)
 	}
 
-	#Cnk : Analytic Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	#Cnk : Analytic Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
 	static [BigNum] Cnk([BigNum] $n, [BigNum] $k){
 		if($n.IsInteger() -and ($n -le -1)) {
 			throw "[BigNum]::Cnk: n cannot be a negative integer (poles)."
@@ -4564,7 +4387,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
-	#Combination : Classical Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
+	#Combination : Classical Combination. C(n,k) function. Binomial coeficients. n! / k!(n-k)!.
 	static [System.Numerics.BigInteger] Combination([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
 		if ($n -lt 0) {
 			throw "[BigNum]::Combination Error : n must be greater or equal to 0. Use [BigNum]::Cnk for the full analytic continuation"
@@ -4603,7 +4426,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return $res
 	}
 
-	#CnkMulti : Analytic Multiset Combination (Multichoose). C(n+k-1, k).
+	#CnkMulti : Analytic Multiset Combination (Multichoose). C(n+k-1, k).
 	static [BigNum] CnkMulti([BigNum] $n, [BigNum] $k){
 		if($n.IsInteger() -and $k.IsInteger()) {
 			return ([BigNum]([BigNum]::CombinationMulti($n.Int(),$k.Int())))
@@ -4612,7 +4435,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return [BigNum]::Cnk($newVal,$k)
 	}
 
-	#CombinationMulti : Classical Multiset Combination (Multichoose). C(n+k-1, k).
+	#CombinationMulti : Classical Multiset Combination (Multichoose). C(n+k-1, k).
 	static [System.Numerics.BigInteger] CombinationMulti([System.Numerics.BigInteger] $n, [System.Numerics.BigInteger] $k){
 		return [BigNum]::Combination($n+$k-1,$k)
 	}
@@ -5262,7 +5085,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		$coeffs  = [System.Collections.Generic.List[BigNum]]::new()
 		$sqrt2pi = [BigNum]::Sqrt([BigNum]::Tau($tauResolution))
-		# c0 = 1/sqrt(2π)
+		# c0 = 1/sqrt(2*Pi)
 		$coeffs.Add( (([BigNum]1) / $sqrt2pi).CloneWithNewResolution($workResolution) )
 
 		# Precompute factorials: 0!..(a-1)! (as BigNum at $wrk)
@@ -5289,7 +5112,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			$den = $fact[$k-1] * $sqrt2pi
 			$coeffs.Add(($num / $den).CloneWithNewResolution($workResolution))
 
-			# update e^{a-k} → e^{a-(k+1)} by dividing once by e
+			# update e^{a-k} -> e^{a-(k+1)} by dividing once by e
 			$expPart = $expPart / $E
 		}
 
@@ -5673,4 +5496,13 @@ function New-BigComplex {
 	)
 
 	return New-Object -TypeName "BigComplex" $val
+}
+
+function New-BigFormula {
+	[CmdletBinding()]
+	param (
+		[string] $val="0"
+	)
+
+	return New-Object -TypeName "BigFormula" $val
 }
