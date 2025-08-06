@@ -157,10 +157,10 @@ Describe "BigNum class unit tests" {
             ([BigNum]::Factorial(10)).ToString() | Should -Be 3628800
         }
         It "Computes (5.5)! with 10 digits correctly" {
-            ([BigNum]::Factorial(([BigNum]5.5).CloneWithNewResolution(10))).ToString() | Should -Match "^287[,.]885277815"
+            ([BigNum]::Factorial(5.5)).ToString() | Should -Match "^287[,.]885277815"
         }
         It "Computes Gamma(-4.5) with 10 digits correctly" {
-            ([BigNum]::Gamma(([BigNum]"-4.5").CloneWithNewResolution(10))).CloneWithNewResolution(10).ToString() | Should -Match "^-0[,.]0600196013"
+            ([BigNum]::Gamma([BigNum]"-4.5")).CloneWithNewResolution(10).ToString() | Should -Match "^-0[,.]0600196013"
         }
     }
 

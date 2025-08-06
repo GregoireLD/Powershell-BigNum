@@ -1707,52 +1707,54 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 		[System.Numerics.BigInteger] $targetResolution = $z.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
+		# [System.Numerics.BigInteger] $lnResolution = ($workResolution + 10) * 2
 
 		$tmpValue = $z.CloneWithNewResolution($workResolution)
 
 		[BigComplex] $result = [BigComplex]::GammaComplex($tmpValue)
-
 		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	# GammaComplex : INTERNAL USE. Compute the complex value of the Gamma function for complex z.
 	hidden static [BigComplex] GammaComplex( [BigComplex] $z ){
-
 		if ($z.IsPureReal() -and $z.IsInteger() -and $z.IsNegative()) {
 			throw "[BigComplex]::GammaComplex(): pole at negative or null real integer z"
 		}
 		
 		[System.Numerics.BigInteger] $targetResolution = $z.GetMaxDecimalResolution()
-		[BigNum] $targetResBigNum = [BigNum]::new($targetResolution)
-		[System.Numerics.BigInteger] $workResolution = ($targetResBigNum*1.1).Ceiling(0).Int()+10
+		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
+		[System.Numerics.BigInteger] $lnResolution = ($workResolution + 10) * 2
 
 		$tmpValue = $z.CloneWithNewResolution($workResolution)
 
-		$lnG = [BigComplex]::LnGammaComplex($tmpValue.CloneWithNewResolution($workResolution))
-		$G   = [BigComplex]::Exp($lnG)
-		return $G.CloneAndRoundWithNewResolution($workResolution)
+		$lnG = [BigComplex]::LnGammaComplex($tmpValue.CloneWithNewResolution($lnResolution))
+		$G   = [BigComplex]::Exp($lnG).CloneWithNewResolution($workResolution)
+		$result = $G * [BigComplex]::Sqrt([BigNum]::Pi($workResolution)*2)
+		return $result.CloneAndRoundWithNewResolution($workResolution)
 	}
 
 	# LnGammaComplex : INTERNAL USE. Compute the Log base e of the complex Gamma function.
 	hidden static [BigComplex] LnGammaComplex([BigComplex] $z ){
-		# if ($z.realPart -le 0) {
-		# 	throw "[BigNum]::LnGammaComplex(): z must be > 0  (use Gamma to get reflection)."
-		# }
-
 		[System.Numerics.BigInteger] $targetResolution = $z.GetMaxDecimalResolution()
 		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
 		[BigComplex] $tmpZ = $z.CloneWithNewResolution($workResolution)
 
 		# Pick Spouge parameter a
         [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($workResolution)
+		$coeffs = [BigNum]::BuildAllSpougeCoefficients($selectedA, $workResolution)
 
 		# Series S = c₀ + Σ_{k=1}^{a-1} c_k / (x-1+k)
-        [BigComplex] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$workResolution)
-        for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
-            [BigComplex] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$workResolution)
-            [BigComplex] $den = $tmpZ - 1 + $k
-            $S += ($ck / $den)
-        }
+        # [BigComplex] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$workResolution)
+        # for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
+        #     [BigComplex] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$workResolution)
+        #     [BigComplex] $den = $tmpZ - 1 + $k
+        #     $S += ($ck / $den)
+        # }
+		[BigComplex] $S = $coeffs[0]
+		$S = $S.CloneWithNewResolution($workResolution)
+		for ($k=1; $k -lt $selectedA; $k++) {
+			$S += ([BigComplex]$coeffs[$k]) / ($tmpZ - 1 + $k)
+		}
 
 		# Main terms
         $term1 = ($tmpZ - 0.5) * [BigComplex]::Ln(($tmpZ + $selectedA - 1).CloneWithNewResolution($workResolution))
@@ -3325,13 +3327,28 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	# SpouseChooseA: INTERNAL USE. Heuristic a depending on the number of digits requested
     hidden static [System.Numerics.BigInteger] SpouseChooseA([System.Numerics.BigInteger] $resolution) {
-		$targetResolution = $resolution
-		$workResolution = $targetResolution + 10
+		[BigNum] $targetResolutionBN = $resolution + 5
+		[System.Numerics.BigInteger] $targetResolution = $resolution + 5
+		
+		if($resolution -lt 1 ){return 10}
 
-        $ln2pi = [BigNum]::Ln(([BigNum]2).CloneWithNewResolution($workResolution) * [BigNum]::Pi($workResolution))
-		$ln10  = [BigNum]::Ln(10).CloneWithNewResolution($workResolution)
-        $aEst  = (((([BigNum]$workResolution).CloneWithNewResolution($workResolution) * $ln10) / $ln2pi).Ceiling(0) + ([BigNum]10)).Int()
-		return [BigNum]::Max($aEst, 10).Int()
+        $lnPi2 = [BigNum]::Ln([BigNum]2).CloneWithNewResolution($targetResolution) * [BigNum]::Pi($targetResolution*2)
+
+		[BigNum] $tmpA = ($targetResolutionBN * $lnPi2).Ceiling(0)
+		if ($tmpA -lt 3) { $tmpA = 10 }
+
+		$keepLooping = $true
+		while ($keepLooping) {
+			$lhs = ($tmpA + 0.5) * $lnPi2 + 0.5 * [BigNum]::Log(10,$tmpA)
+			if ($lhs -ge $targetResolutionBN) { $keepLooping = $false }
+			$tmpA += 1
+		}
+
+		if ($tmpA -lt 10) {
+			$tmpA = 10
+		}
+		
+		return ($tmpA.Ceiling(0).Int())
     }
 
 	#endregion internals private methods
@@ -3757,7 +3774,10 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 		[System.Numerics.BigInteger] $targetResolution = $z.maxDecimalResolution
-		[System.Numerics.BigInteger] $workResolution = (([BigNum]$targetResolution)*1.1).Ceiling(0).Int()+20
+		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
+		[System.Numerics.BigInteger] $lnResolution = ($workResolution + 10) * 2
+
+		[BigNum] $constPi = [BigNum]::Pi($workResolution)
 
 		# fast path: positive integers
 		if ($z.IsInteger() -and ($z -gt 0)) {
@@ -3766,15 +3786,15 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 		# positive non-integer branch
 		if ($z -gt 0) {
-			$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($workResolution))
+			$lnG = [BigNum]::LnGammaPos($z.CloneWithNewResolution($lnResolution))
 			$G   = [BigNum]::Exp($lnG)
-			return $G.CloneAndRoundWithNewResolution($targetResolution)
+			$result = $G * [BigNum]::Sqrt($constPi * 2)
+			return $result.CloneAndRoundWithNewResolution($targetResolution)
 		}
 
 		# negative non-integer branch
 		[BigNum] $tmpZ = $z.CloneWithNewResolution($workResolution)
 		[BigNum] $constOne  = ([BigNum]1).CloneWithNewResolution($workResolution)
-		[BigNum] $constPi   = [BigNum]::Pi($workResolution)
 		
 		[BigNum] $sinPiZ = [BigNum]::Sin($constPi * $tmpZ)
 		if ($sinPiZ.IsNull()) {
@@ -3783,12 +3803,13 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 		[BigNum] $oneMinusZ = $constOne - $tmpZ
-    	[BigNum] $tmpLnGammaPos = [BigNum]::LnGammaPos($oneMinusZ)
-		[BigNum] $tmpGammaPos   = [BigNum]::Exp($tmpLnGammaPos)
+    	[BigNum] $tmpLnGammaPos = [BigNum]::LnGammaPos($oneMinusZ.CloneWithNewResolution($lnResolution))
+		[BigNum] $tmpGammaPos   = [BigNum]::Exp($tmpLnGammaPos).CloneWithNewResolution($workResolution)
 
 		[BigNum] $num = $constPi
 		[BigNum] $den = ($sinPiZ * $tmpGammaPos)
 		[BigNum] $result = $num / $den
+		$result = $result / [BigNum]::Sqrt($constPi * 2)
 
 		return $result.CloneAndRoundWithNewResolution($targetResolution)
 	}
@@ -3837,18 +3858,24 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		}
 
 		[System.Numerics.BigInteger] $targetResolution = $z.maxDecimalResolution
-		[System.Numerics.BigInteger] $workResolution = $targetResolution + 20
+		[System.Numerics.BigInteger] $workResolution = $targetResolution + 10
 
 		# Pick Spouge parameter a
         [System.Numerics.BigInteger] $selectedA = [BigNum]::SpouseChooseA($workResolution)
+		$coeffs = [BigNum]::BuildAllSpougeCoefficients($selectedA, $workResolution)
 
 		# Series S = c₀ + Σ_{k=1}^{a-1} c_k / (x-1+k)
-        [BigNum] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$workResolution)
-        for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
-            [BigNum] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$workResolution)
-            [BigNum] $den  = $z - 1 + $k
-            $S += ($ck / $den)
-        }
+        # [BigNum] $S = [BigNum]::SpougeCoefficient(0,$selectedA,$workResolution)
+        # for ([System.Numerics.BigInteger] $k = 1; $k -lt $selectedA; $k += 1) {
+        #     [BigNum] $ck = [BigNum]::SpougeCoefficient($k,$selectedA,$workResolution)
+        #     [BigNum] $den  = $z - 1 + $k
+        #     $S += ($ck / $den)
+        # }
+		[BigNum] $S = $coeffs[0]
+		$S = $S.CloneWithNewResolution($workResolution)
+		for ($k=1; $k -lt $selectedA; $k++) {
+			$S += $coeffs[$k] / ($z - 1 + $k)
+		}
 
 		# Main terms
         $term1 = ($z - 0.5) * [BigNum]::Ln(($z + $selectedA - 1).CloneWithNewResolution($workResolution))
@@ -5221,6 +5248,52 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
         $ck = ($sign * $powPart * $expPart) / $fact
 
 		return $ck.CloneAndRoundWithNewResolution($targetResolution)
+	}
+
+	# BuildAllSpougeCoefficients: Build all Spouge Coefficients at once
+	hidden static [System.Collections.Generic.List[BigNum]] BuildAllSpougeCoefficients([System.Numerics.BigInteger] $a, [System.Numerics.BigInteger] $resolution) {
+		$targetResolution = $resolution
+		$workResolution = $targetResolution + 10
+		$tauResolution = $workResolution + 5
+
+		if ($a -lt 3) {
+			throw "error in [BigNum]::BuildAllSpougeCoefficients : a must be equal or greater than 3"
+		}
+
+		$coeffs  = [System.Collections.Generic.List[BigNum]]::new()
+		$sqrt2pi = [BigNum]::Sqrt([BigNum]::Tau($tauResolution))
+		# c0 = 1/sqrt(2π)
+		$coeffs.Add( (([BigNum]1) / $sqrt2pi).CloneWithNewResolution($workResolution) )
+
+		# Precompute factorials: 0!..(a-1)! (as BigNum at $wrk)
+		$fact = [System.Collections.Generic.List[BigNum]]::new()
+		$fact.Add([BigNum]::new(1).CloneWithNewResolution($workResolution))  # 0!
+		for ($t=1; $t -lt $a; $t++) {
+			$fact.Add($fact[$t-1] * $t)                           # t!
+		}
+
+		# Precompute E and start expPart = e^(a-1); then divide by e each k
+		$E = [BigNum]::e($workResolution)
+		$expPart = [BigNum]::Exp([BigNum]::new($a-1).CloneWithNewResolution($workResolution))
+
+		for ($k=1; $k -lt $a; $k++) {
+			$sign = (($k % 2) -eq 1) ? 1 : -1
+			$ak   = $a - $k                             # integer > 0
+			# powPart = (a-k)^(k) / sqrt(a-k)   (no fractional pow)
+			$akBN   = [BigNum]::new($ak).CloneWithNewResolution($workResolution)
+			$intPow = [BigNum]::PowInt($akBN, $k)       # integer exponent
+			$sqrt   = [BigNum]::Sqrt($akBN)
+			$powPart = $intPow / $sqrt
+
+			$num = [BigNum]::new($sign).CloneWithNewResolution($workResolution) * $powPart * $expPart
+			$den = $fact[$k-1] * $sqrt2pi
+			$coeffs.Add(($num / $den).CloneWithNewResolution($workResolution))
+
+			# update e^{a-k} → e^{a-(k+1)} by dividing once by e
+			$expPart = $expPart / $E
+		}
+
+		return $coeffs
 	}
 
 	# ReciprocalPow : INTERNAL USE. Returns the value of 1/N^p at $res resolution.

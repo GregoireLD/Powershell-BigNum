@@ -198,7 +198,7 @@ To clear them:
 
 ## 🧪 Planned Improvements
 
-* Performance optimizations on the Gamma functions
+* TBD
 
 ---
 
