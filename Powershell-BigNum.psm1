@@ -179,17 +179,33 @@ class BigFormula : System.IFormattable {
 
         # --- Real Constants (built once per instance at requested precision)
         $this.ConstsR = @{
-            'Pi'  = [BigNum]::Pi($this.GetWorkResolution())
-            'Tau' = [BigNum]::Tau($this.GetWorkResolution())
-            'e'   = [BigNum]::e($this.GetWorkResolution())
+            'Pi'                = [BigNum]::Pi($this.GetWorkResolution())
+            'Tau'               = [BigNum]::Tau($this.GetWorkResolution())
+            'e'                 = [BigNum]::e($this.GetWorkResolution())
+			'Phi'               = [BigNum]::Phi($this.GetWorkResolution())
+			'Psi'               = [BigNum]::Psi($this.GetWorkResolution())
+			'c'                 = [BigNum]::c().CloneWithNewResolution($this.GetWorkResolution())
+			'Plank_h'           = [BigNum]::Plank_h().CloneWithNewResolution($this.GetWorkResolution())
+			'Plank_Reduced_h'   = [BigNum]::Plank_Reduced_h().CloneWithNewResolution($this.GetWorkResolution())
+			'Boltzmann_k'       = [BigNum]::Boltzmann_k().CloneWithNewResolution($this.GetWorkResolution())
+			'G'                 = [BigNum]::G().CloneWithNewResolution($this.GetWorkResolution())
+			'Avogadro_Mole'     = [BigNum]::Avogadro_Mole().CloneWithNewResolution($this.GetWorkResolution())
         }
 
 		# --- Complex Constants (note both 'i' and "Unicode U+1D456 "Mathematical Italic Small i")
 		$this.ConstsC = @{
-			'Pi' = [BigComplex]::new([BigNum]::Pi($this.GetWorkResolution()), [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Tau'= [BigComplex]::new([BigNum]::Tau($this.GetWorkResolution()), [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'e'  = [BigComplex]::new([BigNum]::e($this.GetWorkResolution()),   [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'i'  = ([BigComplex]"i").CloneWithNewResolution($this.GetWorkResolution())
+			'Pi'                = [BigComplex]::new([BigNum]::Pi($this.GetWorkResolution())  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'Tau'               = [BigComplex]::new([BigNum]::Tau($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'e'                 = [BigComplex]::new([BigNum]::e($this.GetWorkResolution())   , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'Phi'               = [BigComplex]::new([BigNum]::Phi($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'Psi'               = [BigComplex]::new([BigNum]::Psi($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'c'                 = [BigComplex]::new([BigNum]::c()                  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'Plank_h'           = [BigComplex]::new([BigNum]::Plank_h()            , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'Plank_Reduced_h'   = [BigComplex]::new([BigNum]::Plank_Reduced_h()    , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'Boltzmann_k'       = [BigComplex]::new([BigNum]::Boltzmann_k()        , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'G'                 = [BigComplex]::new([BigNum]::G()                  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'Avogadro_Mole'     = [BigComplex]::new([BigNum]::Avogadro_Mole()      , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
+			'i'                 = ([BigComplex]"i").CloneWithNewResolution($this.GetWorkResolution())
 		}
 
         $this.Rpn = $this.ParseToRpn($this.sourceExpr)
@@ -500,7 +516,11 @@ class BigFormula : System.IFormattable {
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
-					if ($v -isnot [BigNum]) { $v = [BigNum]::new($v) }
+					if ($v -is [BigFormula]){
+						$v = $v.EvaluateR($vars)
+					}elseif ($v -isnot [BigNum]) {
+						$v = [BigNum]::new($v)
+					}
 					return $this.EnsureBN($v, $p)
 				}
 				if ($tmpConst.ContainsKey($n.Name)) { return $this.EnsureBN($tmpConst[$n.Name], $p) }
@@ -559,6 +579,7 @@ class BigFormula : System.IFormattable {
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
+					if ($v -is [BigFormula]) { $v = $v.Evaluate($vars) }
 					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
 					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
 					return $this.EnsureBC([BigComplex]::new([BigComplex]$v),$p)
@@ -2483,6 +2504,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	hidden static [BigNum] $cachedPi
 	hidden static [BigNum] $cachedTau
 	hidden static [BigNum] $cachedPhi
+	hidden static [BigNum] $cachedPsi
 	hidden static [hashtable] $cachedBernoulliNumberB = @{}  # n -> @{num=BigInteger; den=BigInteger}
 	hidden static [BigNum] $cachedEulerMascheroniGamma
 	hidden static [BigNum] $cachedSqrt2
@@ -4856,7 +4878,8 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum] $tmpPhi = ($constOne + $constSqrt5) / $constTwo
 		
 		# Store at the new resolution
-		[BigNum]::cachedPhi = $tmpPhi.Clone().CloneAndRoundWithNewResolution($targetResolution)
+		[BigNum]::cachedPhi = $tmpPhi.CloneAndRoundWithNewResolution($targetResolution)
+		[BigNum]::cachedPsi = ($constOne-$tmpPhi).CloneAndRoundWithNewResolution($targetResolution)
 
 		# Return the new value
 		return [BigNum]::cachedPhi.Clone()
@@ -4865,6 +4888,42 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# ClearCachedPhi : Clear the cached digits of Phi.
 	static [void] ClearCachedPhi() {
     	[BigNum]::cachedPhi = $null
+	}
+
+	# Psi : Return the exact 1000 first digits of Psi (Phi congugate).
+	static [BigNum] Psi() {
+		return [BigNum]::new("-0.6180339887498948482045868343656381177203091798057628621354486227052604628189024497072072041893911374847540880753868917521266338622235369317931800607667263544333890865959395829056383226613199282902678806752087668925017116962070322210432162695486262963136144381497587012203408058879544547492461856953648644492410443207713449470495658467885098743394422125448770664780915884607499887124007652170575179788341662562494075890697040002812104276217711177780531531714101170466659914669798731761356006708748071013179523689427521948435305678300228785699782977834784587822891109762500302696156170025046433824377648610283831268330372429267526311653392473167111211588186385133162038400522216579128667529465490681131715993432359734949850904094762132229810172610705961164562990981629055520852479035240602017279974717534277759277862561943208275051312181562855122248093947123414517022373580577278616008688382952304592647878017889921990270776903895321968198615143780314997411069260886742962267575605231727775203536139362").CloneWithAdjustedResolution()
+	}
+
+	# Psi : (BigInteger) Return the $resolution first digits of Psi (Phi congugate).
+	static [BigNum] Psi([System.Numerics.BigInteger] $resolution) {
+		$targetResolution = $resolution
+		$workResolution = $targetResolution + 100
+
+		if($resolution -lt 0){
+			throw "Resolution for Psi must be a null or positive integer"
+		}
+
+		if (-not [BigNum]::cachedPsi) {
+        	[BigNum]::cachedPsi = [BigNum]::Psi()
+    	}
+
+		if ($targetResolution -le 1000) {
+			return [BigNum]::Psi().CloneAndRoundWithNewResolution($targetResolution)
+		}
+
+		if ($targetResolution -le [BigNum]::cachedPsi.GetMaxDecimalResolution()) {
+			return [BigNum]::cachedPsi.CloneAndRoundWithNewResolution($targetResolution)
+		}
+
+		[BigNum]::Phi($targetResolution)
+
+		return [BigNum]::cachedPsi.Clone()
+	}
+
+	# ClearCachedPsi : Clear the cached digits of Psi (Phi congugate).
+	static [void] ClearCachedPsi() {
+    	[BigNum]::cachedPsi = $null
 	}
 
 	# EnsureBernoulliNumberBUpTo : INTERNAL USE. Generates the Nth Numerator and Denominator of Bernoulli Number B.
@@ -5416,6 +5475,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		[BigNum]::ClearCachedTau()
 		[BigNum]::ClearCachedE()
 		[BigNum]::ClearCachedPhi()
+		[BigNum]::ClearCachedPsi()
 		[BigNum]::ClearCachedBernoulliNumberB()
 		[BigNum]::ClearCachedEulerMascheroniGamma()
 		[BigNum]::ClearCachedSqrt2()
