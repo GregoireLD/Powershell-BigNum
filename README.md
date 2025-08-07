@@ -129,11 +129,16 @@ $BinetB = [BigFormula]"((UZero * Phi) - UOne)/(Sqrt(5))"
 # Formula for the full Complex Binet Formula
 $BinetUz = [BigFormula]"(A * Pow(Phi, z))+(B * Pow(Psi, z))"
 
-# Nest formulas and inject parameters for Binet Formula :
-# UZero and UOne are the first two terms of the sequence (0,1 corresponds to Fibonacci Sequence)
-$BinetUz.Evaluate(@{A=$BinetA ; B=$BinetB ; UZero=0 ; UOne=1 ; z=13})
-# Same Formula, but generating the Lucas Number Sequence (2,1 corresponds to Lucas Number Sequence)
-$BinetUz.Evaluate(@{A=$BinetA ; B=$BinetB ; UZero=2 ; UOne=1 ; z=13})
+# Nest formulas and inject parameters for Binet Formula
+# UZero and UOne are the first two terms of the sequence
+# -> {0,1} corresponds to Fibonacci Sequence
+# -> {2,1} corresponds to Lucas Number Sequence
+
+# Generate the first ten terms of Fibonacci Sequence
+for($i=0;$i -le 10;$i += 1) {$BinetUz.Evaluate(@{A=$BinetA ; B=$BinetB ; UZero=0 ; UOne=1 ; z=$i})}
+
+# Generate the first ten terms of Lucas Number Sequence
+for($i=0;$i -le 10;$i += 1) {$BinetUz.Evaluate(@{A=$BinetA ; B=$BinetB ; UZero=2 ; UOne=1 ; z=$i})}
 ```
 
 ---
