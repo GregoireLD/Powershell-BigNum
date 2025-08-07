@@ -119,6 +119,21 @@ $formula3 = [BigFormula]"2exp(3i*Tau/2)"            # New Formula with implicit 
 $formula3                                           # Display the formula and reveal implicit multiplications
 ```
 
+### BigFormula Nested complex Binet example
+
+```powershell
+# Create the "A" value in the generalised Binet Formula
+$BinetA = [BigFormula]"(UOne - (UZero * Psi))/(Sqrt(5))"
+# Create the "B" value in the generalised Binet Formula
+$BinetB = [BigFormula]"((UZero * Phi) - UOne)/(Sqrt(5))"
+# Formula for the full Complex Binet Formula
+$BinetUz = [BigFormula]"(A * Pow(Phi, z))+(B * Pow(Psi, z))"
+
+# Nest formulas and inject parameters for Binet Formula :
+# UZero and UOne are the first two terms of the sequence (0,1 corresponds to Fibonacci Sequence)
+$BinetUz.Evaluate(@{A=$BinetA ; B=$BinetB ; UZero=0 ; UOne=1 ; z=13})
+```
+
 ---
 
 ## ⚙️ Resolution Control

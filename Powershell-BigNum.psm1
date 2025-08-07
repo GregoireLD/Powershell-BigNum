@@ -517,7 +517,7 @@ class BigFormula : System.IFormattable {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
 					if ($v -is [BigFormula]){
-						$v = $v.EvaluateR($vars)
+						$v = $v.CloneWithNewTargetResolution($this.GetTargetResolution()+5).EvaluateR($vars)
 					}elseif ($v -isnot [BigNum]) {
 						$v = [BigNum]::new($v)
 					}
@@ -579,7 +579,7 @@ class BigFormula : System.IFormattable {
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
-					if ($v -is [BigFormula]) { $v = $v.Evaluate($vars) }
+					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($this.GetTargetResolution()+5).Evaluate($vars) }
 					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
 					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
 					return $this.EnsureBC([BigComplex]::new([BigComplex]$v),$p)
@@ -848,31 +848,31 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	
 	#region Constructors
 
-	# BigNum : (BigNum,BigNum) Standard Constructor with all possible parameters.
+	# BigComplex : (BigNum,BigNum) Standard Constructor with all possible parameters.
 	BigComplex([BigNum]$ar,[BigNum]$bi) {
 		$this.Init($ar,$bi)
     }
 
-	# BigNum : (BigNum) Standard Constructor for a pure real number.
+	# BigComplex : (BigNum) Standard Constructor for a pure real number.
 	BigComplex([BigNum]$ar) {
 		$this.Init($ar,0)
     }
 
-	# BigNum : (BigInteger,BigInteger) Standard Constructor for a BigInteger based complex number.
+	# BigComplex : (BigInteger,BigInteger) Standard Constructor for a BigInteger based complex number.
 	BigComplex([System.Numerics.BigInteger]$ar,[System.Numerics.BigInteger]$bi) {
 		$this.Init($ar,$bi)
     }
 
-	# BigNum : (BigInteger) Standard Constructor for a pure real number using a BigInteger.
+	# BigComplex : (BigInteger) Standard Constructor for a pure real number using a BigInteger.
 	BigComplex([System.Numerics.BigInteger]$ar) {
 		$this.Init($ar,0)
     }
 
-	# BigNum : () Standard Empty Constructor, returns a null BigComplex.
+	# BigComplex : () Standard Empty Constructor, returns a null BigComplex.
 	BigComplex() {
 		$this.Init(0,0)
     }
-	# BigNum : () Standard Empty Constructor, returns a null BigComplex.
+	# BigComplex : () Standard Empty Constructor, returns a null BigComplex.
 	BigComplex([string]$val) {
 		$this.extractFromString($val)
     }
@@ -922,7 +922,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			$tmpRealPart = ([BigNum]$cleanStringVal)
 		} elseif (($nbPlus+$nbMinus) -eq 0) {
 			# If we have an i-part but no symbols -> only positive imaginary
-			$tmpImaginaryPart = ([BigNum]$cleanStringVal)
+			$tmpImaginaryPart = ([BigNum]$cleanStringVal.replace("i",""))
 			if(($tmpImaginaryPart.IsNull()) -and ($cleanStringVal -eq "i")) { $tmpImaginaryPart = ([BigNum]1) }
 		} elseif (($nbPlus+$nbMinus) -eq 1) {
 			# If we only have one symbole
@@ -934,12 +934,12 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 				$tmpSplit = $cleanStringVal.Split('-')
 				$mustFlipI = $true
 			}
-			$tmpRealPart = ([BigNum]$tmpSplit[0])
-			$tmpImaginaryPart = ([BigNum]$tmpSplit[1])
+			$tmpRealPart = ([BigNum]$tmpSplit[0].replace("i",""))
+			$tmpImaginaryPart = ([BigNum]$tmpSplit[1].replace("i",""))
 			if(($tmpImaginaryPart.IsNull()) -and ($tmpSplit[1] -eq "i")) { $tmpImaginaryPart = ([BigNum]1) }
 
 		} else {
-			# If we have two symbole
+			# If we have two symbols
 			# Before the second symbol -> real part, sign of the first symbol
 			# After the second symbol -> imaginary part, sign of the second symbol
 			$cursor = -1
@@ -948,8 +948,8 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 				$cursor += 1
 				if(($cleanStringVal[$cursor] -eq '+') -or ($cleanStringVal[$cursor] -eq '-')){ $symbolCounter += 1 }
 			}
-			$tmpRealPart = ([BigNum]($cleanStringVal.Substring(0,$cursor)))
-			$tmpImaginaryPart = ([BigNum]($cleanStringVal.Substring($cursor)))
+			$tmpRealPart = ([BigNum]($cleanStringVal.Substring(0,$cursor).replace("i","")))
+			$tmpImaginaryPart = ([BigNum]($cleanStringVal.Substring($cursor).replace("i","")))
 		}
 
 		if ($mustFlipR) { $tmpRealPart *= -1 }
@@ -2693,6 +2693,9 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	# extractFromString : INTERNAL USE. Initialise a BigNum instance using a String as a source.
 	hidden [void] extractFromString([string]$stringVal) {
+		if($stringVal.Replace([char]::ConvertFromUtf32(0x1d456), "i").ToLowerInvariant().Contains("i")){
+			throw "[BigNum]::extractFromString : Error when parsing BigNum, Complex number detected"
+		}
 		$numberFormat = (Get-Culture).NumberFormat
 		$deciChar = $numberFormat.NumberDecimalSeparator
 		$negChar = $numberFormat.negativeSign
@@ -3416,8 +3419,12 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			throw "[BigNum]::Pow is not capable of handling complex value output. Please use [BigComplex]::Pow() instead."
 		}
 		[System.Numerics.BigInteger] $targetResolution = [System.Numerics.BigInteger]::Max($base.maxDecimalResolution,$exponent.maxDecimalResolution)
+		[System.Numerics.BigInteger] $WorkResolution = $targetResolution + 20
 
-		return [BigNum]::new([BigNum]::Exp(($exponent*([BigNum]::Ln($base))))).CloneAndRoundWithNewResolution($targetResolution)
+		$tmpExp = $exponent.CloneWithNewResolution($WorkResolution)
+		$tmpBase = $base.CloneWithNewResolution($WorkResolution)
+
+		return [BigNum]::new([BigNum]::Exp(($tmpExp*([BigNum]::Ln($tmpBase))))).CloneAndRoundWithNewResolution($targetResolution)
 	}
 
 	# Sqrt : Returns the value of the Square Root of $value using the Newton-Raphson algorithm.
