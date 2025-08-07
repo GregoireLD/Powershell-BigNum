@@ -717,6 +717,7 @@ class BigFormula : System.IFormattable {
 				}
 				'func' {
 					$fmeta = $this.FuncsR[$node.name]
+					if (-not $fmeta) { $fmeta = $this.FuncsC[$node.name] }
 					if (-not $fmeta) { throw "Unknown function '$($node.name)' in ToString()." }
 					$argc = [int]$fmeta['argc']
 					if ($argc -lt 0) { throw "Function '$($node.name)' must have fixed argc for pretty-print." }
@@ -730,7 +731,7 @@ class BigFormula : System.IFormattable {
 				}
 				'op' {
 					$op   = [string]$node.value
-					$meta = $this.TSHOpMeta($op,$this.OpsR)
+					$meta = $this.TSHOpMeta($op,$this.OpsR,$this.OpsC)
 					$argc = [int]$meta['argc']
 					$prec = [int]$meta['prec']
 					$assoc= [string]$meta['assoc']
@@ -774,9 +775,10 @@ class BigFormula : System.IFormattable {
 		return ($stack.Pop().s)
 	}
 
-	hidden [System.Object] TSHOpMeta([string]$op, [hashtable]$ops) {
-		$m = $ops[$op]
-		if (-not $m) { $m = @{} }
+	hidden [System.Object] TSHOpMeta([string]$op, [hashtable]$opsA, [hashtable]$opsB) {
+		$m = $opsA[$op]
+		if (-not $m) { $m = $opsB[$op] }
+		if (-not $m) { throw "TSHOpMeta: Operator $op not found" }
 
 		# precedence: higher = binds tighter
 		# typical math defaults if not provided:
