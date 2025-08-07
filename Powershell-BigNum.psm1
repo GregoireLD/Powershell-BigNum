@@ -129,6 +129,8 @@ class BigFormula : System.IFormattable {
 			'Pnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::Pnk($y,$x) } }
 			'Cnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::Cnk($y,$x) } }
 			'CnkMulti' = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::CnkMulti($y,$x) } }
+
+			'if'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
             # add more as needed
         }
 
@@ -174,6 +176,8 @@ class BigFormula : System.IFormattable {
 			'Pnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::Pnk($y,$x) } }
 			'Cnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::Cnk($y,$x) } }
 			'CnkMulti' = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::CnkMulti($y,$x) } }
+
+			'if'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
 			# add more as needed
 		}
 
