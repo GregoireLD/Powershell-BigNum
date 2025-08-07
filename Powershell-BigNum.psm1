@@ -334,7 +334,7 @@ class BigFormula : System.IFormattable {
 				if ($this.IsKnownIdentName($m.Value)) {
 					$toks.Add(@{ kind='ident'; value=$this.GetKnownIdentName($m.Value) })
 				}else {
-					$toks.Add(@{ kind='ident'; value=$m.Value.ToLowerInvariant() })
+					$toks.Add(@{ kind='ident'; value=$m.Value })
 				}
                 $i += $m.Length; continue
             }

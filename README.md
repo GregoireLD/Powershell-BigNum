@@ -132,6 +132,8 @@ $BinetUz = [BigFormula]"(A * Pow(Phi, z))+(B * Pow(Psi, z))"
 # Nest formulas and inject parameters for Binet Formula :
 # UZero and UOne are the first two terms of the sequence (0,1 corresponds to Fibonacci Sequence)
 $BinetUz.Evaluate(@{A=$BinetA ; B=$BinetB ; UZero=0 ; UOne=1 ; z=13})
+# Same Formula, but generating the Lucas Number Sequence (2,1 corresponds to Lucas Number Sequence)
+$BinetUz.Evaluate(@{A=$BinetA ; B=$BinetB ; UZero=2 ; UOne=1 ; z=13})
 ```
 
 ---
