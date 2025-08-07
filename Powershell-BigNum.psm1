@@ -516,6 +516,7 @@ class BigFormula : System.IFormattable {
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
+					if ($v -is [string]){ $v = [BigFormula]$v }
 					if ($v -is [BigFormula]){
 						$v = $v.CloneWithNewTargetResolution($this.GetTargetResolution()+5).EvaluateR($vars)
 					}elseif ($v -isnot [BigNum]) {
@@ -524,7 +525,7 @@ class BigFormula : System.IFormattable {
 					return $this.EnsureBN($v, $p)
 				}
 				if ($tmpConst.ContainsKey($n.Name)) { return $this.EnsureBN($tmpConst[$n.Name], $p) }
-				if ($n.Name -eq "i") { throw "Symbol i detected. Use Calculate instead for complex evaluation" }
+				if ($n.Name -eq "i") { throw "Symbol i detected. Use Evaluate instead for complex evaluation" }
 				throw "Unknown symbol '$($n.Name)'."
 			}
 			'func' {
@@ -579,6 +580,7 @@ class BigFormula : System.IFormattable {
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
+					if ($v -is [string]){ $v = [BigFormula]$v }
 					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($this.GetTargetResolution()+5).Evaluate($vars) }
 					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
 					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
