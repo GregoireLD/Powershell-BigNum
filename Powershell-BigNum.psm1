@@ -1,7 +1,7 @@
 
 #region Classes
 
-class BigFormula : System.IFormattable {
+class BigFormula : System.IFormattable, System.Collections.IEnumerable {
     hidden [string]                              $sourceExpr
     hidden [System.Numerics.BigInteger]          $targetResolution
 	hidden static [System.Numerics.BigInteger]   $defaultTargetResolution = 100
@@ -16,6 +16,8 @@ class BigFormula : System.IFormattable {
 	hidden [hashtable]                           $ConstsC            # Complex constants: name -> [BigNum]
     hidden [regex]                               $rxNumber = '^[0-9]+(\.[0-9]+)?([eE][+\-]?[0-9]+)?'
     hidden [regex]                               $rxIdent  = '^\p{L}[\p{L}\p{Nd}_]*'
+
+
 
     BigFormula([string] $expr, [System.Numerics.BigInteger] $resolution) {
 		$this.Init($expr,$resolution)
@@ -131,6 +133,10 @@ class BigFormula : System.IFormattable {
 			'CnkMulti' = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::CnkMulti($y,$x) } }
 
 			'if'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Floor'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Ceil'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Min'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Max'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
             # add more as needed
         }
 
@@ -178,6 +184,15 @@ class BigFormula : System.IFormattable {
 			'CnkMulti' = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::CnkMulti($y,$x) } }
 
 			'if'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Floor'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Ceil'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'ArgMin'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'ArgMax'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'MagnitudeMin'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'MagnitudeMax'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Re'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'Im'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			# 'ImFactor'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
 			# add more as needed
 		}
 
@@ -676,6 +691,16 @@ class BigFormula : System.IFormattable {
 	#endregion Evaluate methods and helpers
 
 
+	#region IEnumerable Interface Implementation
+
+	# GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
+	[System.Collections.IEnumerator] GetEnumerator() {
+		return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
+	}
+
+	#endregion IEnumerable Interface Implementation
+
+
 	#region ToString method and helpers
 
 	# ToString : IFormattable Implementation. Return a culture-aware default string representation of the original BigFormula.
@@ -848,7 +873,7 @@ class BfNode {
     }
 }
 
-class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[object] {
+class BigComplex : System.IFormattable, System.IComparable, System.Collections.IEnumerable, System.IEquatable[object] {
 
 	hidden [BigNum] $realPart
 	hidden [BigNum] $imaginaryPart
@@ -1227,6 +1252,15 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	#endregion Standard Interface Implementations
 
 
+	#region IEnumerable Interface Implementation
+
+	# GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
+	[System.Collections.IEnumerator] GetEnumerator() {
+		return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
+	}
+
+	#endregion IEnumerable Interface Implementation
+
 
 	#region Base Operators
 
@@ -1291,13 +1325,6 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# -bnot   op_OnesComplement
 
 	#endregion Base Operators
-
-
-
-	#region internals private methods
-
-
-	#endregion internals private methods
 
 
 
@@ -2501,7 +2528,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 }
 
 
-class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object] {
+class BigNum : System.IFormattable, System.IComparable, System.Collections.IEnumerable, System.IEquatable[object] {
 
 	hidden [System.Numerics.BigInteger] $integerVal
 	hidden [System.Numerics.BigInteger] $shiftVal
@@ -3016,6 +3043,15 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	#endregion Standard Interface Implementations
 
+
+	#region IEnumerable Interface Implementation
+
+	# GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
+	[System.Collections.IEnumerator] GetEnumerator() {
+		return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
+	}
+
+	#endregion IEnumerable Interface Implementation
 
 
 	#region Base Operators
@@ -4913,7 +4949,6 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	# Psi : (BigInteger) Return the $resolution first digits of Psi (Phi congugate).
 	static [BigNum] Psi([System.Numerics.BigInteger] $resolution) {
 		$targetResolution = $resolution
-		$workResolution = $targetResolution + 100
 
 		if($resolution -lt 0){
 			throw "Resolution for Psi must be a null or positive integer"
