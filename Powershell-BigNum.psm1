@@ -1,7 +1,7 @@
 
 #region Classes
 
-class BigFormula : System.IFormattable, System.Collections.IEnumerable {
+class BigFormula : System.IFormattable {
     hidden [string]                              $sourceExpr
     hidden [System.Numerics.BigInteger]          $targetResolution
 	hidden static [System.Numerics.BigInteger]   $defaultTargetResolution = 100
@@ -91,108 +91,118 @@ class BigFormula : System.IFormattable, System.Collections.IEnumerable {
 
         # --- Real Functions (fixed arity for simplicity)
         $this.FuncsR = @{
-			'Ln'       = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Ln($x) } }
-			'Exp'      = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Exp($x) } }
-			'Log'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::Log($y,$x) } }
-			'Pow'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::Pow($y,$x) } }
-            'Sqrt'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Sqrt($x) } }
-			'Cbrt'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Cbrt($x) } }
-			'NthRoot'  = @{ argc = 2 ; resBonus =  8 ; fn = { param($x,$y) [BigNum]::NthRoot($y,$x) } }
-			'ModPow'   = @{ argc = 3 ; resBonus = 10 ; fn = { param($x,$y,$z) [BigNum]::ModPow($z,$y,$x) } }
-            'Gamma'    = @{ argc = 1 ; resBonus = 12 ; fn = { param($x) [BigNum]::Gamma($x) } }
+			'Ln'             = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Ln($x) } }
+			'Exp'            = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Exp($x) } }
+			'Log'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::Log($y,$x) } }
+			'Pow'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::Pow($y,$x) } }
+            'Sqrt'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Sqrt($x) } }
+			'Cbrt'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Cbrt($x) } }
+			'NthRoot'        = @{ argc = 2 ; resBonus =  8 ; fn = { param($x,$y)      [BigNum]::NthRoot($y,$x) } }
+			'ModPow'         = @{ argc = 3 ; resBonus = 10 ; fn = { param($x,$y,$z)   [BigNum]::ModPow($z,$y,$x) } }
+            'Gamma'          = @{ argc = 1 ; resBonus = 12 ; fn = { param($x)         [BigNum]::Gamma($x) } }
 
-			'Sin'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Sin($x) } }
-            'Cos'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Cos($x) } }
-            'Tan'      = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Tan($x) } }
-			'Csc'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Csc($x) } }
-			'Sec'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Sec($x) } }
-			'Cot'      = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Cot($x) } }
-			'Arcsin'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arcsin($x) } }
-			'Arccos'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arccos($x) } }
-			'Arctan'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Arctan($x) } }
-			'Atan2'    = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::Atan2($y,$x) } }
-			'Arccsc'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arccsc($x) } }
-			'Arcsec'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arcsec($x) } }
-			'Arccot'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Arccot($x) } }
+			'Sin'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Sin($x) } }
+            'Cos'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Cos($x) } }
+            'Tan'            = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Tan($x) } }
+			'Csc'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Csc($x) } }
+			'Sec'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Sec($x) } }
+			'Cot'            = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Cot($x) } }
+			'Arcsin'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arcsin($x) } }
+			'Arccos'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arccos($x) } }
+			'Arctan'         = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Arctan($x) } }
+			'Atan2'          = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::Atan2($y,$x) } }
+			'Arccsc'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arccsc($x) } }
+			'Arcsec'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arcsec($x) } }
+			'Arccot'         = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Arccot($x) } }
 
-			'Sinh'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Sinh($x) } }
-			'Cosh'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Cosh($x) } }
-			'Tanh'     = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Tanh($x) } }
-			'Csch'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Csch($x) } }
-			'Sech'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Sech($x) } }
-			'Coth'     = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Coth($x) } }
-			'Arcsinh'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arcsinh($x) } }
-			'Arccosh'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arccosh($x) } }
-			'Arctanh'  = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Arctanh($x) } }
-			'Arccsch'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arccsch($x) } }
-			'Arcsech'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigNum]::Arcsech($x) } }
-			'Arccoth'  = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigNum]::Arccoth($x) } }
+			'Sinh'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Sinh($x) } }
+			'Cosh'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Cosh($x) } }
+			'Tanh'           = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Tanh($x) } }
+			'Csch'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Csch($x) } }
+			'Sech'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Sech($x) } }
+			'Coth'           = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Coth($x) } }
+			'Arcsinh'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arcsinh($x) } }
+			'Arccosh'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arccosh($x) } }
+			'Arctanh'        = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Arctanh($x) } }
+			'Arccsch'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arccsch($x) } }
+			'Arcsech'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigNum]::Arcsech($x) } }
+			'Arccoth'        = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigNum]::Arccoth($x) } }
+			'Pnk'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::Pnk($y,$x) } }
+			'Cnk'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::Cnk($y,$x) } }
+			'CnkMulti'       = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::CnkMulti($y,$x) } }
 
-			'Pnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::Pnk($y,$x) } }
-			'Cnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::Cnk($y,$x) } }
-			'CnkMulti' = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigNum]::CnkMulti($y,$x) } }
-
-			'if'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Floor'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Ceil'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Min'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Max'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			'if'             = @{ argc = 3 ; resBonus =  0 ; fn = { param($x,$y,$z)   if($z -ne 0){$y}else{$x} } }
+			'Floor'          = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Floor($x,0) } }
+			'Ceil'           = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Ceiling($x,0) } }
+			'FloorX'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Floor($y,$x.Int()) } }
+			'CeilX'          = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Ceiling($y,$x.Int()) } }
+			'Abs'            = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Abs($x) } }
+			'Magnitude'      = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Abs($x) } }
+			'Min'            = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Min($y,$x) } }
+			'Max'            = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Max($y,$x) } }
             # add more as needed
         }
 
 		# --- Complex Functions (fixed arity for simplicity)
 		$this.FuncsC = @{
-			'Ln'       = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Ln($x) } }
-			'Exp'      = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Exp($x) } }
-			'Log'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::Log($y,$x) } }
-			'Pow'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::Pow($y,$x) } }
-			'Sqrt'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Sqrt($x) } }
-			'Cbrt'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Cbrt($x) } }
-			'NthRoot'  = @{ argc = 2 ; resBonus =  8 ; fn = { param($x,$y) [BigComplex]::NthRoot($y,$x) } }
-			'ModPow'   = @{ argc = 3 ; resBonus = 10 ; fn = { param($x,$y,$z) [BigComplex]::ModPow($z,$y,$x) } }
-			'Gamma'    = @{ argc = 1 ; resBonus = 12 ; fn = { param($x) [BigComplex]::Gamma($x) } }
+			'Ln'             = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Ln($x) } }
+			'Exp'            = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Exp($x) } }
+			'Log'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::Log($y,$x) } }
+			'Pow'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::Pow($y,$x) } }
+			'Sqrt'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Sqrt($x) } }
+			'Cbrt'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Cbrt($x) } }
+			'NthRoot'        = @{ argc = 2 ; resBonus =  8 ; fn = { param($x,$y)      [BigComplex]::NthRoot($y,$x) } }
+			'ModPow'         = @{ argc = 3 ; resBonus = 10 ; fn = { param($x,$y,$z)   [BigComplex]::ModPow($z,$y,$x) } }
+			'Gamma'          = @{ argc = 1 ; resBonus = 12 ; fn = { param($x)         [BigComplex]::Gamma($x) } }
 
-			'Sin'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Sin($x) } }
-			'Cos'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Cos($x) } }
-			'Tan'      = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Tan($x) } }
-			'Csc'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Csc($x) } }
-			'Sec'      = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Sec($x) } }
-			'Cot'      = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Cot($x) } }
-			'Arcsin'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arcsin($x) } }
-			'Arccos'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arccos($x) } }
-			'Arctan'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Arctan($x) } }
-			'Atan2'    = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::Atan2($y,$x) } }
-			'Arccsc'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arccsc($x) } }
-			'Arcsec'   = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arcsec($x) } }
-			'Arccot'   = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Arccot($x) } }
+			'Sin'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Sin($x) } }
+			'Cos'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Cos($x) } }
+			'Tan'            = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Tan($x) } }
+			'Csc'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Csc($x) } }
+			'Sec'            = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Sec($x) } }
+			'Cot'            = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Cot($x) } }
+			'Arcsin'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arcsin($x) } }
+			'Arccos'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arccos($x) } }
+			'Arctan'         = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Arctan($x) } }
+			'Atan2'          = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::Atan2($y,$x) } }
+			'Arccsc'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arccsc($x) } }
+			'Arcsec'         = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arcsec($x) } }
+			'Arccot'         = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Arccot($x) } }
 
-			'Sinh'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Sinh($x) } }
-			'Cosh'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Cosh($x) } }
-			'Tanh'     = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Tanh($x) } }
-			'Csch'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Csch($x) } }
-			'Sech'     = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Sech($x) } }
-			'Coth'     = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Coth($x) } }
-			'Arcsinh'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arcsinh($x) } }
-			'Arccosh'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arccosh($x) } }
-			'Arctanh'  = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Arctanh($x) } }
-			'Arccsch'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arccsch($x) } }
-			'Arcsech'  = @{ argc = 1 ; resBonus =  8 ; fn = { param($x) [BigComplex]::Arcsech($x) } }
-			'Arccoth'  = @{ argc = 1 ; resBonus = 10 ; fn = { param($x) [BigComplex]::Arccoth($x) } }
+			'Sinh'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Sinh($x) } }
+			'Cosh'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Cosh($x) } }
+			'Tanh'           = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Tanh($x) } }
+			'Csch'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Csch($x) } }
+			'Sech'           = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Sech($x) } }
+			'Coth'           = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Coth($x) } }
+			'Arcsinh'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arcsinh($x) } }
+			'Arccosh'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arccosh($x) } }
+			'Arctanh'        = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Arctanh($x) } }
+			'Arccsch'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arccsch($x) } }
+			'Arcsech'        = @{ argc = 1 ; resBonus =  8 ; fn = { param($x)         [BigComplex]::Arcsech($x) } }
+			'Arccoth'        = @{ argc = 1 ; resBonus = 10 ; fn = { param($x)         [BigComplex]::Arccoth($x) } }
 
-			'Pnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::Pnk($y,$x) } }
-			'Cnk'      = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::Cnk($y,$x) } }
-			'CnkMulti' = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y) [BigComplex]::CnkMulti($y,$x) } }
+			'Pnk'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::Pnk($y,$x) } }
+			'Cnk'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::Cnk($y,$x) } }
+			'CnkMulti'       = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::CnkMulti($y,$x) } }
 
-			'if'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Floor'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Ceil'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'ArgMin'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'ArgMax'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'MagnitudeMin'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'MagnitudeMax'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Re'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'Im'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
-			# 'ImFactor'   = @{ argc = 3 ; resBonus = 0 ; fn = { param($x,$y,$z) if($z -ne 0){$y}else{$x} } }
+			'if'             = @{ argc = 3 ; resBonus =  0 ; fn = { param($x,$y,$z)   if($z -ne 0){$y}else{$x} } }
+			'Floor'          = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Floor($x, 0) } }
+			'Ceil'           = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Ceiling($x, 0) } }
+			'FloorX'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::Floor($y,$x.Real().Int()) } }
+			'CeilX'          = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::Ceiling($y,$x.Real().Int()) } }
+			'Abs'            = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Abs($x) } }
+			'Magnitude'      = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Abs($x) } }
+			'Arg'            = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Arg($x) } }
+			'PosArg'         = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::PosArg($x) } }
+			'ArgMin'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::ArgMin($y,$x) } }
+			'ArgMax'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::ArgMax($y,$x) } }
+			'MagnitudeMin'   = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::MagnitudeMin($y,$x) } }
+			'MagnitudeMax'   = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::MagnitudeMax($y,$x) } }
+			'Re'             = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Real($x) } }
+			'Im'             = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Imaginary($x) } }
+			'ImFactor'       = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::ImaginaryFactor($x) } }
+			'Conjugate'      = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Conjugate($x) } }
 			# add more as needed
 		}
 
@@ -693,10 +703,10 @@ class BigFormula : System.IFormattable, System.Collections.IEnumerable {
 
 	#region IEnumerable Interface Implementation
 
-	# GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
-	[System.Collections.IEnumerator] GetEnumerator() {
-		return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
-	}
+	# # GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
+	# [System.Collections.IEnumerator] GetEnumerator() {
+	# 	return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
+	# }
 
 	#endregion IEnumerable Interface Implementation
 
@@ -873,7 +883,7 @@ class BfNode {
     }
 }
 
-class BigComplex : System.IFormattable, System.IComparable, System.Collections.IEnumerable, System.IEquatable[object] {
+class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[object] {
 
 	hidden [BigNum] $realPart
 	hidden [BigNum] $imaginaryPart
@@ -1254,10 +1264,10 @@ class BigComplex : System.IFormattable, System.IComparable, System.Collections.I
 
 	#region IEnumerable Interface Implementation
 
-	# GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
-	[System.Collections.IEnumerator] GetEnumerator() {
-		return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
-	}
+	# # GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
+	# [System.Collections.IEnumerator] GetEnumerator() {
+	# 	return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
+	# }
 
 	#endregion IEnumerable Interface Implementation
 
@@ -2414,27 +2424,37 @@ class BigComplex : System.IFormattable, System.IComparable, System.Collections.I
 
 	#region instance Methods
 
-	# Conjugate : Return a clone containing the conjugate original BigNum.
+	# Conjugate : Return a clone containing the conjugate original BigComplex.
 	[BigComplex] Conjugate() {
         return [BigComplex]::new($this.realPart, -$this.imaginaryPart)
     }
 
-	# Abs : Alias of Magnitude.
-	[BigNum] Abs() {
-		return $this.Magnitude()
-	}
+	# static Conjugate : Return a new BigComplex containing the conjugate original BigComplex.
+	static [BigComplex] Conjugate([BigComplex] $z) {
+        return $z.Conjugate()
+    }
 
-	# Magnitude : Return the Magnitude (Modulus) of the original BigNum.
-	[BigNum] Magnitude() {
+	# Abs : Return the Magnitude (Modulus) of the original BigComplex.
+	[BigNum] Abs() {
 		return [BigNum]::Sqrt($this.MagnitudeSquared())
 	}
 
-	# MagnitudeSquared : Return the squared Magnitude (Modulus) of the original BigNum.
+	# static Magnitude : Return a new BigNum containing the Magnitude (Modulus) of the original BigComplex.
+	static [BigNum] Abs([BigComplex] $z) {
+        return $z.Abs()
+    }
+
+	# Magnitude : Alias of Abs.
+	[BigNum] Magnitude() {
+		return $this.Abs()
+	}
+
+	# MagnitudeSquared : Return the squared Magnitude (Modulus) of the original BigComplex.
 	[BigNum] MagnitudeSquared() {
         return [BigNum]::Pow($this.realPart, 2) + [BigNum]::Pow($this.imaginaryPart, 2)
     }
 
-	# Arg : Return a BigNum containing the argument of the original BigNum in ]-Pi,Pi].
+	# Arg : Return a BigNum containing the argument of the original BigComplex in ]-Pi,Pi].
 	[BigNum] Arg() {
 		if($this.IsNull()) {
 			throw "[BigComplex]::Arg() : not defined for z = 0"
@@ -2447,6 +2467,11 @@ class BigComplex : System.IFormattable, System.IComparable, System.Collections.I
 		 	$tmpAtan2 = [BigNum]::Pi($targetResolution)
 		}
         return $tmpAtan2.Clone()
+    }
+
+	# static Arg : Return a new BigNum containing the argument of the original BigComplex in ]-Pi,Pi].
+	static [BigNum] Arg([BigComplex] $z) {
+        return $z.Arg()
     }
 
 	# PosArg : Return a BigNum containing the argument of the original BigNum in [0,Tau[.
@@ -2470,20 +2495,40 @@ class BigComplex : System.IFormattable, System.IComparable, System.Collections.I
         return $tmpAtan2.Clone()
     }
 
+	# static PosArg : Return a new BigNum containing the argument of the original BigNum in [0,Tau[.
+	static [BigNum] PosArg([BigComplex] $z) {
+        return $z.Arg()
+    }
+
 	# Real : Return a BigNum contaning only the real part of the original value.
 	[BigNum] Real() {
 		return $this.realPart.Clone()
 	}
+
+	# static Real : Return a new BigNum contaning only the real part of the original value.
+	static [BigNum] Real([BigComplex] $z) {
+        return $z.Real()
+    }
 
 	# Imaginary : Return a BigComplex contaning only the imaginary part of the original value, including i.
 	[BigComplex] Imaginary() {
 		return [BigComplex]::new(0,$this.imaginaryPart)
 	}
 
+	# static Imaginary : Return a new BigComplex contaning only the imaginary part of the original value, including i.
+	static [BigComplex] Imaginary([BigComplex] $z) {
+        return $z.Imaginary()
+    }
+
 	# ImaginaryFactor : Return a BigNum contaning the imaginary factor of the original value.
 	[BigNum] ImaginaryFactor() {
 		return $this.imaginaryPart.Clone()
 	}
+
+	# static ImaginaryFactor : Return a new BigNum contaning the imaginary factor of the original value.
+	static [BigNum] ImaginaryFactor([BigComplex] $z) {
+        return $z.ImaginaryFactor()
+    }
 
 	# FractionalPart : Return a clone containing the Fractional Part of the original BigComplex.
 	[BigComplex] FractionalPart() {
@@ -2513,6 +2558,16 @@ class BigComplex : System.IFormattable, System.IComparable, System.Collections.I
 		return [BigComplex]::new($this.realPart.Floor($decimals),$this.imaginaryPart.Floor($decimals))
 	}
 
+	# static Ceiling : Return a new BigComplex rounded to $decimals digits, using the always up rule.
+	static [BigComplex] Ceiling([BigComplex] $z, [System.Numerics.BigInteger]$decimals){
+		return $z.Ceiling($decimals)
+	}
+
+	# static Floor : Return a new BigComplex rounded to $decimals digits, using the always down rule.
+	static [BigComplex] Floor([BigComplex] $z, [System.Numerics.BigInteger]$decimals){
+		return $z.Floor($decimals)
+	}
+
 	# RoundAwayFromZero : Return a clone of the original BigNum rounded to $decimals digits, using the always Away-From-Zero rule.
 	[BigComplex] RoundAwayFromZero([System.Numerics.BigInteger]$decimals){
 		return [BigComplex]::new($this.realPart.RoundAwayFromZero($decimals),$this.imaginaryPart.RoundAwayFromZero($decimals))
@@ -2528,7 +2583,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.Collections.I
 }
 
 
-class BigNum : System.IFormattable, System.IComparable, System.Collections.IEnumerable, System.IEquatable[object] {
+class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object] {
 
 	hidden [System.Numerics.BigInteger] $integerVal
 	hidden [System.Numerics.BigInteger] $shiftVal
@@ -3046,10 +3101,10 @@ class BigNum : System.IFormattable, System.IComparable, System.Collections.IEnum
 
 	#region IEnumerable Interface Implementation
 
-	# GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
-	[System.Collections.IEnumerator] GetEnumerator() {
-		return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
-	}
+	# # GetEnumerator : IEnumerable Implementation. Circumvent the .ToString() ETS Failure. cf https://github.com/PowerShell/PowerShell/issues/25832
+	# [System.Collections.IEnumerator] GetEnumerator() {
+	# 	return [System.Collections.IEnumerator]((@($this.ToString())).GetEnumerator())
+	# }
 
 	#endregion IEnumerable Interface Implementation
 
@@ -4528,6 +4583,11 @@ class BigNum : System.IFormattable, System.IComparable, System.Collections.IEnum
 		return [BigNum]::new($this.integerVal,$this.shiftVal,$false,$this.maxDecimalResolution)
 	}
 
+	# static Abs : Return a new BigNum containing the absolute value of the original BigNum.
+	static [BigNum] Abs([BigNum] $x){
+		return $x.Abs()
+	}
+
 	# FractionalPart : Return a clone containing the Fractional Part of the original BigNum.
 	[BigNum] FractionalPart() {
 		$tmpval = $this.Clone()
@@ -4661,6 +4721,16 @@ class BigNum : System.IFormattable, System.IComparable, System.Collections.IEnum
 		}
 
 		return [BigNum]::new($newVal,$newShift,$newSign,$targetResolution)
+	}
+
+	# static Ceiling : Return a new BigNum rounded to $decimals digits, using the always up rule.
+	static [BigNum] Ceiling([BigNum] $x, [System.Numerics.BigInteger]$decimals){
+		return $x.Ceiling($decimals)
+	}
+
+	# static Floor : Return a new BigNum rounded to $decimals digits, using the always down rule.
+	static [BigNum] Floor([BigNum] $x, [System.Numerics.BigInteger]$decimals){
+		return $x.Floor($decimals)
 	}
 
 	# RoundAwayFromZero : Return a clone of the original BigNum rounded to $decimals digits, using the always Away-From-Zero rule.
