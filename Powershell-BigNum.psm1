@@ -5,7 +5,7 @@ class BigFormula : System.IFormattable {
     hidden [string]                              $sourceExpr
     hidden [System.Numerics.BigInteger]          $targetResolution
 	hidden static [System.Numerics.BigInteger]   $defaultTargetResolution = 100
-	hidden static [System.Numerics.BigInteger]   $GuardPerLevel = 5
+	hidden static [System.Numerics.BigInteger]   $GuardPerLevel = 10
 	hidden static [string]                       $iChar = [char]::ConvertFromUtf32(0x1D456)
     hidden [object[]]                            $Rpn                # output of parsing (Reverse Polish Notation)
     hidden [hashtable]                           $OpsR               # Real operator metadata
@@ -68,9 +68,9 @@ class BigFormula : System.IFormattable {
         $this.OpsR = @{
             '+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
             '-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
-			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
-            '*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
-            '/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
+			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
+            '*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  4 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
+            '/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
             '^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  [BigNum]::Pow($a, $b) } }
             'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } } # unary minus
             '!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigNum]::Gamma($a + 1).CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } }
@@ -80,9 +80,9 @@ class BigFormula : System.IFormattable {
 		$this.OpsC = @{
 			'+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
 			'-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
-			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
-			'*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
-			'/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
+			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
+			'*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  4 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
+			'/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
 			'^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  [BigComplex]::Pow($a,$b) } }
 			'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } }  # unary minus
 			'!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } } # factorial -> Gamma(z+1)
@@ -208,33 +208,33 @@ class BigFormula : System.IFormattable {
 
         # --- Real Constants (built once per instance at requested precision)
         $this.ConstsR = @{
-            'Pi'                = [BigNum]::Pi($this.GetWorkResolution())
-            'Tau'               = [BigNum]::Tau($this.GetWorkResolution())
-            'e'                 = [BigNum]::e($this.GetWorkResolution())
-			'Phi'               = [BigNum]::Phi($this.GetWorkResolution())
-			'Psi'               = [BigNum]::Psi($this.GetWorkResolution())
-			'c'                 = [BigNum]::c().CloneWithNewResolution($this.GetWorkResolution())
-			'Plank_h'           = [BigNum]::Plank_h().CloneWithNewResolution($this.GetWorkResolution())
-			'Plank_Reduced_h'   = [BigNum]::Plank_Reduced_h().CloneWithNewResolution($this.GetWorkResolution())
-			'Boltzmann_k'       = [BigNum]::Boltzmann_k().CloneWithNewResolution($this.GetWorkResolution())
-			'G'                 = [BigNum]::G().CloneWithNewResolution($this.GetWorkResolution())
-			'Avogadro_Mole'     = [BigNum]::Avogadro_Mole().CloneWithNewResolution($this.GetWorkResolution())
+            'Pi'                = @{ val = [BigNum]::Pi($this.GetWorkResolution())             ; fn = {param($resolution)    [BigNum]::Pi($resolution) } }
+            'Tau'               = @{ val = [BigNum]::Tau($this.GetWorkResolution())            ; fn = {param($resolution)    [BigNum]::Tau($resolution) } }
+            'e'                 = @{ val = [BigNum]::e($this.GetWorkResolution())              ; fn = {param($resolution)    [BigNum]::e($resolution) } }
+			'Phi'               = @{ val = [BigNum]::Phi($this.GetWorkResolution())            ; fn = {param($resolution)    [BigNum]::Phi($resolution) } }
+			'Psi'               = @{ val = [BigNum]::Psi($this.GetWorkResolution())            ; fn = {param($resolution)    [BigNum]::Psi($resolution) } }
+			'c'                 = @{ val = [BigNum]::c().CloneWithNewResolution($this.GetWorkResolution())                }
+			'Plank_h'           = @{ val = [BigNum]::Plank_h().CloneWithNewResolution($this.GetWorkResolution())          }
+			'Plank_Reduced_h'   = @{ val = [BigNum]::Plank_Reduced_h().CloneWithNewResolution($this.GetWorkResolution())  }
+			'Boltzmann_k'       = @{ val = [BigNum]::Boltzmann_k().CloneWithNewResolution($this.GetWorkResolution())      }
+			'G'                 = @{ val = [BigNum]::G().CloneWithNewResolution($this.GetWorkResolution())                }
+			'Avogadro_Mole'     = @{ val = [BigNum]::Avogadro_Mole().CloneWithNewResolution($this.GetWorkResolution())    }
         }
 
 		# --- Complex Constants (note both 'i' and "Unicode U+1D456 "Mathematical Italic Small i")
 		$this.ConstsC = @{
-			'Pi'                = [BigComplex]::new([BigNum]::Pi($this.GetWorkResolution())  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Tau'               = [BigComplex]::new([BigNum]::Tau($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'e'                 = [BigComplex]::new([BigNum]::e($this.GetWorkResolution())   , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Phi'               = [BigComplex]::new([BigNum]::Phi($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Psi'               = [BigComplex]::new([BigNum]::Psi($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'c'                 = [BigComplex]::new([BigNum]::c()                  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Plank_h'           = [BigComplex]::new([BigNum]::Plank_h()            , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Plank_Reduced_h'   = [BigComplex]::new([BigNum]::Plank_Reduced_h()    , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Boltzmann_k'       = [BigComplex]::new([BigNum]::Boltzmann_k()        , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'G'                 = [BigComplex]::new([BigNum]::G()                  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'Avogadro_Mole'     = [BigComplex]::new([BigNum]::Avogadro_Mole()      , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())
-			'i'                 = ([BigComplex]"i").CloneWithNewResolution($this.GetWorkResolution())
+			'Pi'                = @{ val = [BigComplex]::new([BigNum]::Pi($this.GetWorkResolution())  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())    ; fn = {param($resolution)    [BigComplex]::new([BigNum]::Pi($resolution)   , [BigNum]::new(0)).CloneWithNewResolution($resolution) } }
+			'Tau'               = @{ val = [BigComplex]::new([BigNum]::Tau($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())    ; fn = {param($resolution)    [BigComplex]::new([BigNum]::Tau($resolution)  , [BigNum]::new(0)).CloneWithNewResolution($resolution) } }
+			'e'                 = @{ val = [BigComplex]::new([BigNum]::e($this.GetWorkResolution())   , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())    ; fn = {param($resolution)    [BigComplex]::new([BigNum]::e($resolution)    , [BigNum]::new(0)).CloneWithNewResolution($resolution) } }
+			'Phi'               = @{ val = [BigComplex]::new([BigNum]::Phi($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())    ; fn = {param($resolution)    [BigComplex]::new([BigNum]::Phi($resolution)  , [BigNum]::new(0)).CloneWithNewResolution($resolution) } }
+			'Psi'               = @{ val = [BigComplex]::new([BigNum]::Psi($this.GetWorkResolution()) , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())    ; fn = {param($resolution)    [BigComplex]::new([BigNum]::Psi($resolution)  , [BigNum]::new(0)).CloneWithNewResolution($resolution) } }
+			'c'                 = @{ val = [BigComplex]::new([BigNum]::c()                  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())              }
+			'Plank_h'           = @{ val = [BigComplex]::new([BigNum]::Plank_h()            , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())              }
+			'Plank_Reduced_h'   = @{ val = [BigComplex]::new([BigNum]::Plank_Reduced_h()    , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())              }
+			'Boltzmann_k'       = @{ val = [BigComplex]::new([BigNum]::Boltzmann_k()        , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())              }
+			'G'                 = @{ val = [BigComplex]::new([BigNum]::G()                  , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())              }
+			'Avogadro_Mole'     = @{ val = [BigComplex]::new([BigNum]::Avogadro_Mole()      , [BigNum]::new(0)).CloneWithNewResolution($this.GetWorkResolution())              }
+			'i'                 = @{ val = ([BigComplex]"i").CloneWithNewResolution($this.GetWorkResolution())                                                                 }
 		}
 
         $this.Rpn = $this.ParseToRpn($this.sourceExpr)
@@ -536,7 +536,7 @@ class BigFormula : System.IFormattable {
 	hidden [BigNum] EvalNodeReal([BfNode]$n,[int]$basePrec,[hashtable]$vars){
 		$tmpOps   = $this.OpsR
 		$tmpFuncs = $this.FuncsR
-		$tmpConst = $this.ConstsR
+		# $tmpConst = $this.ConstsR
 
 		$p = $this.NodePrec($basePrec, $n.Depth, $n.Kind, $n.Name)
 
@@ -547,13 +547,19 @@ class BigFormula : System.IFormattable {
 					$v = $vars[$n.Name]
 					if ($v -is [string]){ $v = [BigFormula]$v }
 					if ($v -is [BigFormula]){
-						$v = $v.CloneWithNewTargetResolution($this.GetTargetResolution()+5).EvaluateR($vars)
+						$v = $v.CloneWithNewTargetResolution($p+5).EvaluateR($vars)
 					}elseif ($v -isnot [BigNum]) {
 						$v = [BigNum]::new($v)
 					}
 					return $this.EnsureBN($v, $p)
 				}
-				if ($tmpConst.ContainsKey($n.Name)) { return $this.EnsureBN($tmpConst[$n.Name], $p) }
+				if ($this.ConstsR.ContainsKey($n.Name)) {
+					if ($this.ConstsR[$n.Name].ContainsKey('val') -and ($this.ConstsR[$n.Name]['val'].GetMaxDecimalResolution() -lt $p) -and $this.ConstsR[$n.Name].ContainsKey('fn')) {
+						$fn   = [scriptblock]$this.ConstsR[$n.Name]['fn']
+						$this.ConstsR[$n.Name]['val'] = $fn.InvokeReturnAsIs(@($p))
+					}
+					return $this.EnsureBN($this.ConstsR[$n.Name]['val'], $p)
+				}
 				if ($n.Name -eq "i") { throw "Symbol i detected. Use Evaluate instead for complex evaluation" }
 				throw "Unknown symbol '$($n.Name)'."
 			}
@@ -597,7 +603,7 @@ class BigFormula : System.IFormattable {
 	hidden [BigComplex] EvalNodeComplex([BfNode]$n,[int]$basePrec,[hashtable]$vars){
 		$tmpOps   = $this.OpsC
 		$tmpFuncs = $this.FuncsC
-		$tmpConst = $this.ConstsC
+		# $tmpConst = $this.ConstsC
 
 		$p = $this.NodePrec($basePrec, $n.Depth, $n.Kind, $n.Name)
 
@@ -609,14 +615,20 @@ class BigFormula : System.IFormattable {
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
-					if ($v -is [string]){ $v = [BigFormula]$v }
-					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($this.GetTargetResolution()+5).Evaluate($vars) }
+					if ($v -is [string]){ $v = ([BigFormula]$v).CloneWithNewTargetResolution($p+5) }
+					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($p+5).Evaluate($vars) }
 					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
 					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
 					return $this.EnsureBC([BigComplex]::new([BigComplex]$v),$p)
 					# throw "Variable '$($n.Name)' must be BigNum or BigComplex."
 				}
-				if ($tmpConst.ContainsKey($n.Name)) { return $this.EnsureBC($tmpConst[$n.Name], $p) }
+				if ($this.ConstsC.ContainsKey($n.Name)) {
+					if ($this.ConstsC[$n.Name].ContainsKey('val') -and ($this.ConstsC[$n.Name]['val'].GetMaxDecimalResolution() -lt $p) -and $this.ConstsC[$n.Name].ContainsKey('fn')) {
+						$fn   = [scriptblock]$this.ConstsC[$n.Name]['fn']
+						$this.ConstsC[$n.Name]['val'] = $fn.InvokeReturnAsIs(@($p))
+					}
+					return $this.EnsureBC($this.ConstsC[$n.Name]['val'], $p)
+				}
 				throw "Unknown symbol '$($n.Name)'."
 			}
 			'func' {
