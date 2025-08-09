@@ -66,26 +66,26 @@ class BigFormula : System.IFormattable {
 
         # --- Real Operators: precedence (higher wins) & associativity
         $this.OpsR = @{
-            '+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
-            '-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
-			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
-            '*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  4 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
+            '+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  3 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
+            '-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  3 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
+			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  8 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
+            '*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
             '/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
             '^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  [BigNum]::Pow($a, $b) } }
-            'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } } # unary minus
-            '!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigNum]::Gamma($a + 1).CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } }
+            'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  3 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } } # unary minus
+            '!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus = 10 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigNum]::Gamma($a + 1).CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+15) } }
         }
 
 		# --- Complex Operators: precedence (higher wins) & associativity. (use your BigComplex arithmetic)
 		$this.OpsC = @{
-			'+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
-			'-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  0 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
-			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
-			'*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  4 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
+			'+' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  3 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a + $b } }
+			'-' = @{ prec = 20; assoc = 'L'; argc = 2; resBonus =  3 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a - $b } }
+			'%' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  8 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a % $b } }
+			'*' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus =  6 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a * $b } }
 			'/' = @{ prec = 30; assoc = 'L'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  $a / $b } }
 			'^' = @{ prec = 40; assoc = 'R'; argc = 2; resBonus = 10 ; fix = 'infix'; type = 'op'; fn = { param($a,$b)  [BigComplex]::Pow($a,$b) } }
-			'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  2 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } }  # unary minus
-			'!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus =  8 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+5) } } # factorial -> Gamma(z+1)
+			'u-'= @{ prec = 50; assoc = 'R'; argc = 1; resBonus =  3 ; fix = 'infix'; type = 'op'; fn = { param($a)     -$a } }  # unary minus
+			'!' = @{ prec = 60; assoc = 'L'; argc = 1; resBonus = 10 ; fix = 'postfix'; type = 'op'; fn = { param($a)  [BigComplex]::Gamma($a + [BigComplex]"1").CloneAndRoundWithNewResolution($a.GetMaxDecimalResolution()+15) } } # factorial -> Gamma(z+1)
 		}
 
 
@@ -131,15 +131,15 @@ class BigFormula : System.IFormattable {
 			'Cnk'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::Cnk($y,$x) } }
 			'CnkMulti'       = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigNum]::CnkMulti($y,$x) } }
 
-			'if'             = @{ argc = 3 ; resBonus =  0 ; fn = { param($x,$y,$z)   if($z -ne 0){$y}else{$x} } }
-			'Floor'          = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Floor($x,0) } }
-			'Ceil'           = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Ceiling($x,0) } }
-			'FloorX'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Floor($y,$x.Int()) } }
-			'CeilX'          = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Ceiling($y,$x.Int()) } }
-			'Abs'            = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Abs($x) } }
-			'Magnitude'      = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigNum]::Abs($x) } }
-			'Min'            = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Min($y,$x) } }
-			'Max'            = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigNum]::Max($y,$x) } }
+			'if'             = @{ argc = 3 ; resBonus =  2 ; fn = { param($x,$y,$z)   if($z -ne 0){$y}else{$x} } }
+			'Floor'          = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigNum]::Floor($x,0) } }
+			'Ceil'           = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigNum]::Ceiling($x,0) } }
+			'FloorX'         = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigNum]::Floor($y,$x.Int()) } }
+			'CeilX'          = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigNum]::Ceiling($y,$x.Int()) } }
+			'Abs'            = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigNum]::Abs($x) } }
+			'Magnitude'      = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigNum]::Abs($x) } }
+			'Min'            = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigNum]::Min($y,$x) } }
+			'Max'            = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigNum]::Max($y,$x) } }
             # add more as needed
         }
 
@@ -186,23 +186,23 @@ class BigFormula : System.IFormattable {
 			'Cnk'            = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::Cnk($y,$x) } }
 			'CnkMulti'       = @{ argc = 2 ; resBonus = 10 ; fn = { param($x,$y)      [BigComplex]::CnkMulti($y,$x) } }
 
-			'if'             = @{ argc = 3 ; resBonus =  0 ; fn = { param($x,$y,$z)   if($z -ne 0){$y}else{$x} } }
-			'Floor'          = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Floor($x, 0) } }
-			'Ceil'           = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Ceiling($x, 0) } }
-			'FloorX'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::Floor($y,$x.Real().Int()) } }
-			'CeilX'          = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::Ceiling($y,$x.Real().Int()) } }
-			'Abs'            = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Abs($x) } }
-			'Magnitude'      = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Abs($x) } }
-			'Arg'            = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Arg($x) } }
-			'PosArg'         = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::PosArg($x) } }
-			'ArgMin'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::ArgMin($y,$x) } }
-			'ArgMax'         = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::ArgMax($y,$x) } }
-			'MagnitudeMin'   = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::MagnitudeMin($y,$x) } }
-			'MagnitudeMax'   = @{ argc = 2 ; resBonus =  0 ; fn = { param($x,$y)      [BigComplex]::MagnitudeMax($y,$x) } }
-			'Re'             = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Real($x) } }
-			'Im'             = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Imaginary($x) } }
-			'ImFactor'       = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::ImaginaryFactor($x) } }
-			'Conjugate'      = @{ argc = 1 ; resBonus =  0 ; fn = { param($x)         [BigComplex]::Conjugate($x) } }
+			'if'             = @{ argc = 3 ; resBonus =  2 ; fn = { param($x,$y,$z)   if($z -ne 0){$y}else{$x} } }
+			'Floor'          = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Floor($x, 0) } }
+			'Ceil'           = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Ceiling($x, 0) } }
+			'FloorX'         = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigComplex]::Floor($y,$x.Real().Int()) } }
+			'CeilX'          = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigComplex]::Ceiling($y,$x.Real().Int()) } }
+			'Abs'            = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Abs($x) } }
+			'Magnitude'      = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Abs($x) } }
+			'Arg'            = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Arg($x) } }
+			'PosArg'         = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::PosArg($x) } }
+			'ArgMin'         = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigComplex]::ArgMin($y,$x) } }
+			'ArgMax'         = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigComplex]::ArgMax($y,$x) } }
+			'MagnitudeMin'   = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigComplex]::MagnitudeMin($y,$x) } }
+			'MagnitudeMax'   = @{ argc = 2 ; resBonus =  2 ; fn = { param($x,$y)      [BigComplex]::MagnitudeMax($y,$x) } }
+			'Re'             = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Real($x) } }
+			'Im'             = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Imaginary($x) } }
+			'ImFactor'       = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::ImaginaryFactor($x) } }
+			'Conjugate'      = @{ argc = 1 ; resBonus =  2 ; fn = { param($x)         [BigComplex]::Conjugate($x) } }
 			# add more as needed
 		}
 
@@ -253,7 +253,7 @@ class BigFormula : System.IFormattable {
 	}
 
 	hidden [System.Numerics.BigInteger] GetWorkResolution() {
-		return $this.targetResolution + 10
+		return $this.targetResolution + 20
 	}
 
     hidden [object[]] ParseToRpn([string] $expr) {
@@ -609,14 +609,13 @@ class BigFormula : System.IFormattable {
 
 		switch ($n.Kind) {
 			'num' {
-				$bn = $this.EnsureBC($n.Value,$p)
-            	return [BigComplex]::new($bn).CloneWithNewResolution($p)
+            	return $this.EnsureBC($n.Value,$p)
 			}
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
-					if ($v -is [string]){ $v = ([BigFormula]$v).CloneWithNewTargetResolution($p+5) }
-					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($p+5).Evaluate($vars) }
+					if ($v -is [string]){ $v = ([BigFormula]$v).CloneWithNewTargetResolution($p) }
+					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($p).Evaluate($vars) }
 					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
 					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
 					return $this.EnsureBC([BigComplex]::new([BigComplex]$v),$p)
