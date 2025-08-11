@@ -614,8 +614,8 @@ class BigFormula : System.IFormattable {
 			'sym' {
 				if ($vars.ContainsKey($n.Name)) {
 					$v = $vars[$n.Name]
-					if ($v -is [string]){ $v = ([BigFormula]$v).CloneWithNewTargetResolution($p) }
-					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($p).Evaluate($vars) }
+					if ($v -is [string]){ $v = [BigFormula]$v }
+					if ($v -is [BigFormula]) { $v = $v.CloneWithNewTargetResolution($p+5).Evaluate($vars) }
 					if ($v -is [BigComplex]) { return $this.EnsureBC($v,$p) }
 					if ($v -is [BigNum])     { return $this.EnsureBC([BigComplex]::new($v),$p) }
 					return $this.EnsureBC([BigComplex]::new([BigComplex]$v),$p)
@@ -5111,7 +5111,7 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 			if (-not [BigNum]::cachedBernoulliNumberB.ContainsKey($m)) {
 				[BigNum]::cachedBernoulliNumberB[$m] = $A[0]
 			} else {
-				# overwrite w/ recomputed canonical form (reduced)
+				# override w/ recomputed canonical form (reduced)
 				[BigNum]::cachedBernoulliNumberB[$m] = $A[0]
 			}
     	}
