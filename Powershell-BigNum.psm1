@@ -693,6 +693,14 @@ class BigFormula : System.IFormattable {
 		return $this.EvaluateR(([hashtable]@{}))
 	}
 
+	[BigComplex] EvaluateR([System.Numerics.BigInteger] $resolution) {
+		return $this.CloneWithNewTargetResolution($resolution).EvaluateR(([hashtable]@{}))
+	}
+
+	[BigComplex] EvaluateR([hashtable] $vars = @{}, [System.Numerics.BigInteger] $resolution) {
+		return $this.CloneWithNewTargetResolution($resolution).EvaluateR($vars)
+	}
+
 	[BigNum] EvaluateR([hashtable] $vars = @{}) {
 		$root = $this.BuildAstFromRpn($false)
 		$res  = $this.EvalNodeReal($root, $this.GetWorkResolution(), $vars)
@@ -701,6 +709,14 @@ class BigFormula : System.IFormattable {
 
 	[BigComplex] Evaluate() {
 		return $this.Evaluate(([hashtable]@{}))
+	}
+
+	[BigComplex] Evaluate([System.Numerics.BigInteger] $resolution) {
+		return $this.CloneWithNewTargetResolution($resolution).Evaluate(([hashtable]@{}))
+	}
+
+	[BigComplex] Evaluate([hashtable] $vars = @{}, [System.Numerics.BigInteger] $resolution) {
+		return $this.CloneWithNewTargetResolution($resolution).Evaluate($vars)
 	}
 
 	[BigComplex] Evaluate([hashtable] $vars = @{}) {
