@@ -46,20 +46,18 @@ It includes a wide set of features: from basic arithmetic to transcendental func
 
 ---
 
-## 🔧 Installation
+## 🔧 Installation using PowerShell Gallery
 
-To use this module, the "Powershell-BigNum" folder, contaning both the psm1
-and the psd1 files, must be in one of your default Powershell Modules folder.
-You can check what they are using :
+You can get this module automaticaly from the PowerShell Gallery as "Powershell-BigNum":
 
 ```powershell
-Write-Output $env:PSModulePath
+Install-Module -Name Powershell-BigNum
 ```
 
-alternatively, you can also manually enable it using the folowing command :
+after installing it, you can make the classes available using the following line either by itself, or adding it in your $PROFILE file.
 
 ```powershell
-Import-Module <Path_to_the_Powershell-BigNum.psm1_file>
+Using module Powershell-BigNum
 ```
 
 ---
