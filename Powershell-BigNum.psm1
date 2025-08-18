@@ -928,6 +928,17 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		$this.Init($ar,0)
     }
 
+	# BigComplex : (BigComplex) Standard BigComplex Constructor.
+	BigComplex([BigComplex]$newVal) {
+        $this.Init($newVal.realPart,$newVal.imaginaryPart)
+    }
+
+	# BigComplex : (BigFormula) Standard BigFormula Constructor.
+	BigComplex([BigFormula]$objFormula) {
+        $newVal = $objFormula.Evaluate()
+        $this.Init($newVal.realPart,$newVal.imaginaryPart)
+    }
+
 	# BigComplex : (BigInteger,BigInteger) Standard Constructor for a BigInteger based complex number.
 	BigComplex([System.Numerics.BigInteger]$ar,[System.Numerics.BigInteger]$bi) {
 		$this.Init($ar,$bi)
@@ -2680,6 +2691,12 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	# BigNum : (BigNum) Standard BigNum Constructor.
 	BigNum([BigNum]$newVal) {
+        $this.Init($newVal.integerVal,$newVal.shiftVal,$newVal.negativeFlag,$newVal.maxDecimalResolution)
+    }
+
+	# BigNum : (BigFormula) Standard BigFormula Constructor.
+	BigNum([BigFormula]$objFormula) {
+		$newVal = $objFormula.EvaluateR()
         $this.Init($newVal.integerVal,$newVal.shiftVal,$newVal.negativeFlag,$newVal.maxDecimalResolution)
     }
 
