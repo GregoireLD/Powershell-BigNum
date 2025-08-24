@@ -1,6 +1,1825 @@
 
 #region Classes
 
+class BigMatrix : System.IFormattable, System.IComparable, System.IEquatable[object] {
+
+    hidden [object[]] $data                   # Flattened array storage
+    hidden [int[]] $dimensions                # Shape of the matrix [rows, cols, depth, ...]
+    hidden [int] $internalRank                # Number of dimensions (including size-1 dims)
+    hidden [int] $effectiveRank               # Number of dimensions ignoring size-1 dims
+    # hidden [int[]] $effectiveDimensions       # Dimensions ignoring size-1 dims
+    hidden [int] $totalElements               # Total number of elements
+    hidden [System.Numerics.BigInteger] $maxDecimalResolution
+    # hidden [string] $elementType              # "BigNum", "BigComplex", or "Mixed"
+    # hidden [string] $orientation              # "row", "column", or "matrix" for effective 1D cases
+	hidden [int] $OneBasedIndexing            # $false for 0-based, $true for 1-based
+	static [int] $defaultToOneBasedIndexing = $false  # Global default
+
+    #region Constructors
+
+    # BigMatrix : (dimensions, elementType) - Create zero matrix with specified dimensions
+    BigMatrix([int[]] $dims) {
+        $this.InitMatrix($dims, $null)
+    }
+
+    # BigMatrix : (rows, cols) - Create 2D zero matrix
+    BigMatrix([int] $rows, [int] $cols) {
+        $this.InitMatrix(@($rows, $cols), $null)
+    }
+
+    # BigMatrix : (data, dimensions) - Create matrix from data array
+    BigMatrix([object[]] $inputData, [int[]] $dims) {
+        $this.InitMatrix($dims, $inputData)
+    }
+
+    # BigMatrix : (2D array) - Create matrix from 2D array
+    BigMatrix([object[][]] $array2D) {
+        $rows = $array2D.Length
+        $cols = if ($rows -gt 0) { $array2D[0].Length } else { 0 }
+        
+        # Flatten the 2D array
+        $flatData = @()
+        for ($i = 0; $i -lt $rows; $i++) {
+            for ($j = 0; $j -lt $cols; $j++) {
+                $flatData += $array2D[$i][$j]
+            }
+        }
+        
+        $this.InitMatrix(@($rows, $cols), $flatData)
+    }
+
+    # BigMatrix : (Dimension-Blind Array) - Create a n-dimensional matrix from an array
+    BigMatrix([object[]] $nDimArray) {
+        if ($null -eq $nDimArray) {
+            $nDimArray = @(0)
+        }
+
+        $this.InitMatrixFromArray($nDimArray)
+    }
+
+    # BigMatrix : (copy constructor)
+    BigMatrix([BigMatrix] $other) {
+        $this.dimensions = $other.dimensions.Clone()
+        $this.internalRank = $other.internalRank
+        $this.effectiveRank = $other.effectiveRank
+        # $this.effectiveDimensions = $other.effectiveDimensions.Clone()
+        # $this.orientation = $other.orientation
+        $this.totalElements = $other.totalElements
+        $this.maxDecimalResolution = $other.maxDecimalResolution
+        # $this.elementType = $other.elementType
+		$this.OneBasedIndexing = $other.OneBasedIndexing
+        $this.data = New-Object object[] $this.totalElements
+        
+        for ($i = 0; $i -lt $this.totalElements; $i++) {
+            $this.data[$i] = $this.CloneElement($other.data[$i])
+        }
+    }
+
+    #endregion Constructors
+
+    #region Initialization
+
+    hidden [void] InitMatrix([int[]] $dims, [object[]] $inputData) {
+        # Validate dimensions
+        if ($dims.Length -eq 0) {
+            throw "Matrix must have at least one dimension"
+        }
+        
+        foreach ($dim in $dims) {
+            if ($dim -le 0) {
+                throw "All dimensions must be positive"
+            }
+        }
+
+		$this.OneBasedIndexing = [BigMatrix]::defaultToOneBasedIndexing
+        $this.dimensions = $dims.Clone()
+        $this.internalRank = $dims.Length
+        $this.totalElements = 1
+        foreach ($dim in $dims) {
+            $this.totalElements *= $dim
+        }
+        
+        # Calculate effective dimensions and rank
+        $this.CalculateEffectiveDimensions()
+        
+        # $this.elementType = $type
+        $this.maxDecimalResolution = 50  # Default resolution
+        $this.data = New-Object object[] $this.totalElements
+
+        # Initialize with data or zeros
+        if ($inputData) {
+            if ($inputData.Length -ne $this.totalElements) {
+                throw "Input data length ($($inputData.Length)) doesn't match matrix size ($($this.totalElements))"
+            }
+            for ($i = 0; $i -lt $this.totalElements; $i++) {
+                $this.data[$i] = $this.ConvertElement($inputData[$i])
+            }
+        } else {
+            # Initialize with zeros
+            for ($i = 0; $i -lt $this.totalElements; $i++) {
+                $this.data[$i] = [BigComplex]0
+            }
+        }
+        
+        $this.UpdateResolution()
+    }
+
+    hidden [void] InitMatrixFromArray([object[]] $nDimArray) {
+        if ($null -eq $nDimArray -or $nDimArray.Length -eq 0) {
+            throw "Input array cannot be null or empty"
+        }
+
+		$this.OneBasedIndexing = [BigMatrix]::defaultToOneBasedIndexing
+
+        # First, determine the rank and dimensions
+        $this.internalRank = [BigMatrix]::RecurseCountInternalRank($nDimArray)
+        $this.dimensions = New-Object int[] $this.internalRank
+
+        # Calculate dimensions at each level
+        [BigMatrix]::RecurseCalculateDimensions($nDimArray, $this.dimensions, 0)
+
+        # Calculate effective dimensions and rank
+        $this.CalculateEffectiveDimensions()
+
+        $this.totalElements = 1
+        foreach ($dim in $this.dimensions) {
+            $this.totalElements *= $dim
+        }
+        
+        # $this.elementType = "Mixed"
+        $this.maxDecimalResolution = [BigComplex]::defaultMaxDecimalResolution  # Default resolution
+        $this.data = New-Object object[] $this.totalElements
+
+        # Initialize with zeros
+        for ($i = 0; $i -lt $this.totalElements; $i++) {
+            # $this.data[$i] = $this.GetZeroElement()
+			$this.data[$i] = [BigComplex]0
+        }
+
+        # Recursively populate the matrix
+        $multiDimCursor = New-Object int[] $this.internalRank
+        $this.RecurseSetElement($nDimArray, $multiDimCursor, 0)
+        
+        $this.UpdateResolution()
+    }
+
+    # Calculate effective dimensions (ignoring dimensions of size 1) and determine orientation
+    hidden [void] CalculateEffectiveDimensions() {
+        # Find all dimensions that are > 1
+        $effectiveDims = @()
+        $singletonPositions = @()
+        
+        for ($i = 0; $i -lt $this.dimensions.Length; $i++) {
+            if ($this.dimensions[$i] -gt 1) {
+                $effectiveDims += $this.dimensions[$i]
+            } else {
+                $singletonPositions += $i
+            }
+        }
+        
+		$this.effectiveRank = $effectiveDims.Length
+    }
+
+    # Helper methods to count internal rank value
+    hidden static [int] RecurseCountInternalRank([object[]] $matrixArray) {
+        [int] $hasNextLevel = 0
+        [int] $maxRecurs = 0
+        [int] $tmpRecurs = 0
+        
+        foreach ($elem in $matrixArray) {
+            if ($elem -is [System.Object[]] -or $elem -is [System.Array]) {
+                $hasNextLevel = 1
+                $tmpRecurs = [BigMatrix]::RecurseCountInternalRank([object[]]$elem)
+                if ($tmpRecurs -gt $maxRecurs) { 
+                    $maxRecurs = $tmpRecurs 
+                }
+            }
+        }
+        
+        if ($hasNextLevel -eq 0) {
+            return 1
+        }
+        return ($maxRecurs + 1)
+    }
+
+    hidden static [void] RecurseCalculateDimensions([object[]] $matrixArray, [int[]] $dimensions, [int] $currentLevel) {
+        if ($currentLevel -ge $dimensions.Length) {
+            return
+        }
+        
+        $dimensions[$currentLevel] = $matrixArray.Length
+        
+        if ($currentLevel + 1 -lt $dimensions.Length) {
+            foreach ($elem in $matrixArray) {
+                if ($elem -is [System.Object[]] -or $elem -is [System.Array]) {
+                    [BigMatrix]::RecurseCalculateDimensions([object[]]$elem, $dimensions, $currentLevel + 1)
+                    break
+                }
+            }
+        }
+    }
+
+    hidden [void] RecurseSetElement([object[]] $currentArray, [int[]] $multiDimCursor, [int] $currentLevel) {
+        if ($currentLevel -ge $this.internalRank) {
+            return
+        }
+        
+        for ($i = 0; $i -lt $currentArray.Length -and $i -lt $this.dimensions[$currentLevel]; $i++) {
+            $multiDimCursor[$currentLevel] = $i
+            $elem = $currentArray[$i]
+            
+            if ($elem -is [System.Object[]] -or $elem -is [System.Array]) {
+                if ($currentLevel + 1 -lt $this.internalRank) {
+                    $this.RecurseSetElement([object[]]$elem, $multiDimCursor, $currentLevel + 1)
+                }
+            } else {
+                if ($currentLevel -eq ($this.internalRank - 1)) {
+                    $flatIndex = $this.GetFlatIndexFromCursor($multiDimCursor)
+                    if ($flatIndex -lt $this.totalElements) {
+                        $this.data[$flatIndex] = $this.ConvertElement($elem)
+                    }
+                } else {
+                    $tempCursor = New-Object int[] $this.internalRank
+                    for ($j = 0; $j -le $currentLevel; $j++) {
+                        $tempCursor[$j] = $multiDimCursor[$j]
+                    }
+                    for ($j = $currentLevel + 1; $j -lt $this.internalRank; $j++) {
+                        $tempCursor[$j] = 0
+                    }
+                    $flatIndex = $this.GetFlatIndexFromCursor($tempCursor)
+                    if ($flatIndex -lt $this.totalElements) {
+                        $this.data[$flatIndex] = $this.ConvertElement($elem)
+                    }
+                }
+            }
+        }
+    }
+
+    hidden [int] GetFlatIndexFromCursor([int[]] $cursor) {
+        if ($cursor.Length -ne $this.internalRank) {
+            throw "Cursor array length ($($cursor.Length)) doesn't match matrix rank ($($this.internalRank))"
+        }
+
+        [int] $flatIndex = 0
+        [int] $multiplier = 1
+        
+        for ($i = $this.internalRank - 1; $i -ge 0; $i--) {
+            $clampedIndex = [Math]::Min($cursor[$i], $this.dimensions[$i] - 1)
+            $clampedIndex = [Math]::Max($clampedIndex, 0)
+            
+            $flatIndex += $clampedIndex * $multiplier
+            $multiplier *= $this.dimensions[$i]
+        }
+        
+        return $flatIndex
+    }
+
+    #region Utility Methods
+
+    hidden [object] ConvertElement([object] $element) {
+		if($element -is [BigNum]) {
+			return [BigComplex]::new($element)
+		} elseif ($element -is [BigComplex]) {
+			return $element.Clone()
+		} else {
+			return [BigComplex]::new($element)
+		}
+        # throw "Unknown element type: $($this.elementType)"
+    }
+
+    hidden [bool] SameDimensions([BigMatrix] $other) {
+        if ($this.rank -ne $other.rank) { return $false }
+        for ($i = 0; $i -lt $this.rank; $i++) {
+            if ($this.dimensions[$i] -ne $other.dimensions[$i]) { return $false }
+        }
+        return $true
+    }
+	
+	#endregion Utility Methods
+
+    hidden [object] CloneElement([object] $element) {
+        if ($element -is [BigNum]) { return $element.Clone() }
+        if ($element -is [BigComplex]) { return $element.Clone() }
+		$tmp = $null
+		if ($element) {
+			try {
+				$tmp = $element.Clone()
+				return $tmp
+			}
+			catch {
+				return $element
+			}
+		}
+        return $null
+    }
+
+    hidden [void] UpdateResolution() {
+        $maxRes = 0
+        for ($i = 0; $i -lt $this.totalElements; $i += 1) {
+            $tmpMaxRes = $this.data[$i].GetMaxDecimalResolution()
+			$maxRes = [Math]::Max($maxRes, $tmpMaxRes)
+        }
+        
+		$this.maxDecimalResolution = $maxRes
+
+		for ($i = 0; $i -lt $this.totalElements; $i += 1) {
+            $tmpMaxRes = $this.data[$i].GetMaxDecimalResolution()
+			if ($tmpMaxRes -ne $this.maxDecimalResolution) {
+				$this.data[$i] = $this.data[$i].CloneWithNewResolution($this.maxDecimalResolution)
+			}
+        }
+    }
+
+	[BigMatrix] Clone() {
+        return [BigMatrix]::new($this)
+    }
+
+    #endregion Initialization
+
+    #region Properties and Info (Updated)
+
+    [int[]] GetShape() { return $this.dimensions.Clone() }
+    [int] GetInternalRank() { return $this.internalRank }
+    [int] GetRank() { return $this.effectiveRank }
+    [int] GetTotalElements() { return $this.totalElements }
+    [System.Numerics.BigInteger] GetMaxDecimalResolution() { return $this.maxDecimalResolution }
+
+    # Check if matrix is effectively a scalar, vector, or higher-dimensional
+    [bool] IsScalar() { return $this.effectiveRank -eq 0 }
+    [bool] IsVector() { return $this.effectiveRank -eq 1 }
+    [bool] Is2DMatrix() { return $this.effectiveRank -eq 2 }
+	[bool] Is3DMatrix() { return $this.effectiveRank -eq 3 }
+	[bool] Is4DMatrix() { return $this.effectiveRank -eq 4 }
+    [bool] IsRowVector() { return ($this.effectiveRank -eq 1) -and ($this.internalRank -eq 1) }
+    [bool] IsColumnVector() { return ($this.effectiveRank -eq 1) -and ($this.internalRank -eq 2) }
+	[bool] IsDepthVector() { return ($this.effectiveRank -eq 1) -and ($this.internalRank -eq 3) }
+
+	# Set index base for this matrix
+	[void] SwitchToOneBasedIndexing() { $this.OneBasedIndexing = $true }
+	[void] SwitchToZeroBasedIndexing() { $this.OneBasedIndexing = $false }
+
+	# Get current index base
+	[bool] IsOneBased() { return $this.OneBasedIndexing }
+	[bool] IsZeroBased() { return ( -not $this.OneBasedIndexing) }
+
+	# Set global default
+	static [void] SwitchGloballyToOneBasedIndexing() { [BigMatrix]::defaultToOneBasedIndexing = $true }
+	static [void] SwitchGloballyToZeroBasedIndexing() { [BigMatrix]::defaultToOneBasedIndexing = $false }
+
+    #endregion Properties and Info
+
+    #region Indexing and Access (existing methods work the same)
+
+	# Convert user indices to internal indices
+	hidden [int[]] UserToInternal([int[]] $userIndices) {
+		if ($this.OneBasedIndexing) {
+			$internal = New-Object int[] $userIndices.Length
+			for ($i = 0; $i -lt $userIndices.Length; $i++) {
+				$internal[$i] = $userIndices[$i] - 1
+			}
+			return $internal
+		}
+		return $userIndices
+	}
+
+	# Convert internal indices to user indices  
+	hidden [int[]] InternalToUser([int[]] $internalIndices) {
+		if ($this.OneBasedIndexing) {
+			$user = New-Object int[] $internalIndices.Length
+			for ($i = 0; $i -lt $internalIndices.Length; $i++) {
+				$user[$i] = $internalIndices[$i] + 1
+			}
+			return $user
+		}
+		return $internalIndices
+	}
+
+    [object] Get([int[]] $indices) {
+		$internalIndices = $this.UserToInternal($indices)
+        $flatIndex = $this.GetFlatIndex($internalIndices)
+        return $this.data[$flatIndex]
+    }
+
+    [void] Set([int[]] $indices, [object] $value) {
+		$internalIndices = $this.UserToInternal($indices)
+        $flatIndex = $this.GetFlatIndex($internalIndices)
+        $this.data[$flatIndex] = $this.ConvertElement($value)
+        $this.UpdateResolution()
+    }
+
+    [object] Get([int] $row, [int] $col) {
+        if ($this.internalRank -ne 2) {
+            throw "Matrix is not 2D. Use Get([int[]]) for multi-dimensional access."
+        }
+        return $this.Get(@($row, $col))
+    }
+
+    [void] Set([int] $row, [int] $col, [object] $value) {
+        if ($this.internalRank -ne 2) {
+            throw "Matrix is not 2D. Use Set([int[]], [object]) for multi-dimensional access."
+        }
+        $this.Set(@($row, $col), $value)
+    }
+
+    hidden [int] GetFlatIndex([int[]] $indices) {
+		if ($indices.Length -gt $this.internalRank) {
+            throw "Index array length ($($indices.Length)) exceed matrix internal rank of ($($this.internalRank))"
+        }
+
+        if ($indices.Length -lt $this.effectiveRank) {
+            throw "Index array length ($($indices.Length)) doesn't match matrix rank ($($this.effectiveRank))"
+        }
+
+		if (($indices.Length -ne $this.effectiveRank) -and ($indices.Length -ne $this.internalRank)) {
+            throw "Index array length ($($indices.Length)) must either match matrix rank ($($this.effectiveRank)) or matrix internal rank of ($($this.internalRank))"
+        }
+
+		if ($indices.Length -eq $this.effectiveRank) {
+            $newIndices = $this.dimensions.Clone()
+			$cursor = 0
+			for ($i = 0; $i -lt $this.internalRank; $i++) {
+				if ($newIndices[$i] -ne 1) {
+					$newIndices[$i] = $indices[$cursor]
+					$cursor += 1
+				} else {
+					$newIndices[$i] = 0
+				}
+			}
+			$indices = $newIndices.Clone()
+        }
+
+        for ($i = 0; $i -lt $this.internalRank; $i++) {
+            if ($indices[$i] -lt 0 -or $indices[$i] -ge $this.dimensions[$i]) {
+                throw "Index $($indices[$i]) out of bounds for dimension $i (size: $($this.dimensions[$i]))"
+            }
+        }
+
+        $flatIndex = 0
+        $multiplier = 1
+        for ($i = $this.internalRank - 1; $i -ge 0; $i--) {
+            $flatIndex += $indices[$i] * $multiplier
+            $multiplier *= $this.dimensions[$i]
+        }
+        
+        return $flatIndex
+    }
+
+    #endregion Indexing and Access
+
+	# region Standard Interface Implementations
+
+    # IComparable - Compare by Frobenius norm
+    [int] CompareTo([object] $other) {
+        if ($null -eq $other) { return 1 }
+        if ($other -isnot [BigMatrix]) { return 1 }
+        
+        $thisNorm = $this.FrobeniusNorm()
+        $otherNorm = ([BigMatrix]$other).FrobeniusNorm()
+        
+        if ($thisNorm -eq $otherNorm) { return 0 }
+        if ($thisNorm -lt $otherNorm) { return -1 }
+        return 1
+    }
+
+    # IEquatable
+    [bool] Equals([object] $other) {
+        if (($null -eq $other) -or ($other -isnot [BigMatrix])) { return $false }
+        
+        $otherMatrix = [BigMatrix]$other
+        if (-not $this.SameDimensions($otherMatrix)) { return $false }
+		if ($this.totalElements -ne $otherMatrix.totalElements) { return $false }
+        
+        for ($i = 0; $i -lt $this.totalElements; $i += 1) {
+            if (-not $this.data[$i].Equals($otherMatrix.data[$i])) {
+                return $false
+            }
+        }
+        return $true
+    }
+
+    [int] GetHashCode() {
+		# ToDo Proper hash
+        return $this.ToString().GetHashCode()
+    }
+
+    # Frobenius norm (for comparison)
+    hidden [object] FrobeniusNorm() {
+        $sum = [BigComplex]0
+        for ($i = 0; $i -lt $this.totalElements; $i++) {
+            $elem = $this.data[$i]
+			$magnitude = $elem.Magnitude()
+			$sum += ([BigComplex]($magnitude * $magnitude))
+        }
+        return [BigComplex]::Sqrt($sum)
+    }
+
+    #endregion Standard Interface Implementations
+
+    #region String Representation (Updated to use effective rank)
+
+    [string] ToString() {
+        return $this.ToString("G", (Get-Culture))
+    }
+
+    [string] ToString([string] $format) {
+        return $this.ToString($format, (Get-Culture))
+    }
+
+    [string] ToString([IFormatProvider] $provider) {
+        return $this.ToString("G", $provider)
+    }
+
+    [string] ToString([string] $format, [IFormatProvider] $provider) {
+        if ($this.IsScalar()) {
+            return $this.ToStringScalar($format, $provider)
+        } elseif ($this.IsVector()) {
+            return $this.ToString1D($format, $provider)
+        } elseif ($this.Is2DMatrix()) {
+            return $this.ToString2D($format, $provider)
+        } elseif ($this.Is3DMatrix()) {
+            return $this.ToString3D($format, $provider)
+		} else {
+            return $this.ToStringND($format, $provider)
+        }
+    }
+
+    hidden [string] ToStringScalar([string] $format, [IFormatProvider] $provider) {
+        $elem = $this.data[0]
+        if ($elem -is [BigNum] -or $elem -is [BigComplex]) {
+            return $elem.ToString($format, $provider)
+        } else {
+            return $elem.ToString()
+        }
+    }
+
+	hidden [int] LongestEntryLength() {
+		[int] $maxLen = 0
+		for ($i = 0; $i -lt $this.totalElements; $i += 1) {
+			$tmpStr = $this.data[$i].ToString()
+			$tmpLen = 0
+
+			if ($tmpStr.IndexOf([BigFormula]::iChar) -ne -1) {
+				$tmpLen = $tmpStr.Length - 1
+			} else {
+				$tmpLen = $tmpStr.Length
+			}
+			$maxLen = [Math]::Max($maxLen,$tmpLen)
+		}
+
+		return $maxLen
+	}
+
+    hidden [string] ToString1D([string] $format, [IFormatProvider] $provider) {
+        $elements = @()
+        for ($i = 0; $i -lt $this.totalElements; $i++) {
+            $elem = $this.data[$i]
+            if ($elem -is [BigNum] -or $elem -is [BigComplex]) {
+                $elements += $elem.ToString($format, $provider)
+            } else {
+                $elements += $elem.ToString()
+            }
+        }
+
+		# Get the reference length of the longest entry
+		$maxLen = $this.LongestEntryLength() + 1
+        
+        # Format based on orientation
+        if ($this.internalRank -eq 2) {
+            # Display as column vector
+            $lines = @()
+            foreach ($elem in $elements) {
+                $lines += " [ $($elem.Replace([BigFormula]::iChar,"i").PadLeft($maxLen , " ").Replace("i",[BigFormula]::iChar)) ]"
+            }
+            return ($lines -join "`n")
+        } else {
+            # Display as row vector
+            return " [ " + ($elements.Replace([BigFormula]::iChar,"i").PadLeft($maxLen , " ").Replace("i",[BigFormula]::iChar) -join ", ") + " ]"
+        }
+    }
+
+    hidden [string] ToString2D([string] $format, [IFormatProvider] $provider) {
+        # Find the effective 2D dimensions
+		$cursor = 0
+		$effectiveDim = New-Object int[] 2
+		for ($i = 0; ($i -lt $this.dimensions.Length) -and ($cursor -lt 2); $i += 1) {
+			if ($this.dimensions[$i] -ne 1) {
+				$effectiveDim[$cursor] = $i
+				$cursor += 1
+			}
+		}
+
+		# Get the reference length of the longest entry
+		$maxLen = $this.LongestEntryLength() + 1
+        
+        # We need to map from effective indices to actual indices
+        $lines = @()
+        
+        for ($i = 0; $i -lt $this.dimensions[$effectiveDim[0]]; $i += 1) {
+            $rowElements = @()
+            for ($j = 0; $j -lt $this.dimensions[$effectiveDim[1]]; $j += 1) {
+                # Map effective 2D indices to actual storage indices
+                $actualIndices = $this.MapEffectiveToActualIndices(@($i, $j))
+                $elem = $this.Get($actualIndices)
+                if ($elem -is [BigNum] -or $elem -is [BigComplex]) {
+					$rowElements += $elem.ToString($format, $provider)
+                } else {
+                    $rowElements += $elem.ToString()
+                }
+            }
+            $lines += " [ " + ($rowElements.Replace([BigFormula]::iChar,"i").PadLeft($maxLen , " ").Replace("i",[BigFormula]::iChar) -join ", ") + " ]"
+        }
+        
+        # return "[" + ($lines -join ",`n ") + "]"
+		return ($lines -join "`n")
+    }
+
+    # Helper method to map effective indices back to actual indices
+    hidden [int[]] MapEffectiveToActualIndices([int[]] $effectiveIndices) {
+        $actualIndices = New-Object int[] $this.internalRank
+        $effectiveIndex = 0
+        
+        for ($i = 0; $i -lt $this.internalRank; $i++) {
+            if ($this.dimensions[$i] -gt 1) {
+                $actualIndices[$i] = $effectiveIndices[$effectiveIndex]
+                $effectiveIndex++
+            } else {
+                $actualIndices[$i] = 0  # Singleton dimension
+            }
+        }
+        
+        return $actualIndices
+    }
+
+	#Todo 3D String output
+	hidden [string] ToString3D([string] $format, [IFormatProvider] $provider) {
+        return $this.ToStringND($format,$provider)
+    }
+
+    hidden [string] ToStringND([string] $format, [IFormatProvider] $provider) {
+        $actualDimStr = "(" + ($this.dimensions -join " x ") + ")"
+        return ("BigMatrix [Dimensions: $($actualDimStr)] with $($this.totalElements) element$(($this.totalElements -le 1)?'':'s')")
+    }
+
+    #endregion String Representation
+
+    #region Arithmetic Operations
+
+    # Addition
+    static [BigMatrix] op_Addition([BigMatrix] $a, [BigMatrix] $b) {
+        if (-not $a.SameDimensions($b)) {
+            throw "Matrix dimensions must match for addition"
+        }
+
+        $result = $a.Clone()
+        for ($i = 0; $i -lt $result.totalElements; $i++) {
+			$result.data[$i] = ([BigFormula]"ValA+ValB").Evaluate(@{ ValA=$a.data[$i] ; ValB=$b.data[$i] })
+            # $result.data[$i] = $result.data[$i] + $b.data[$i]
+        }
+        $result.UpdateResolution()
+        return $result
+    }
+
+    # Subtraction
+    static [BigMatrix] op_Subtraction([BigMatrix] $a, [BigMatrix] $b) {
+        if (-not $a.SameDimensions($b)) {
+            throw "Matrix dimensions must match for subtraction"
+        }
+
+        $result = $a.Clone()
+        for ($i = 0; $i -lt $result.totalElements; $i++) {
+			$result.data[$i] = ([BigFormula]"ValA-ValB").Evaluate(@{ ValA=$a.data[$i] ; ValB=$b.data[$i] })
+            # $result.data[$i] = $result.data[$i] - $b.data[$i]
+        }
+        $result.UpdateResolution()
+        return $result
+    }
+
+    # Matrix multiplication
+    static [BigMatrix] op_Multiply([BigMatrix] $a, [BigMatrix] $b) {
+        # Handle different cases: scalar, vector, matrix multiplication
+        if (($a.effectiveRank -eq 2) -and ($b.effectiveRank -eq 2)) {
+            return [BigMatrix]::MatrixMultiply2D($a, $b)
+        } elseif ($a.effectiveRank -eq 1 -or $b.effectiveRank -eq 1) {
+            return [BigMatrix]::VectorDotProduct($a, $b)
+        } else {
+            throw "Multiplication not supported for matrices with rank > 2"
+        }
+    }
+	
+    # Scalar multiplication
+
+	static [BigMatrix] op_Multiply([BigMatrix] $a, [BigNum] $scalar) {
+        return ($a * ([BigComplex]$scalar))
+    }
+
+    static [BigMatrix] op_Multiply([BigMatrix] $a, [BigComplex] $scalar) {
+        $result = $a.Clone()
+        # $scalarElement = $a.ConvertElement($scalar)
+        
+        for ($i = 0; $i -lt $result.totalElements; $i++) {
+			$result.data[$i] = ([BigFormula]"ValA*ValB").Evaluate(@{ ValA=$a.data[$i] ; ValB=$scalar })
+            # $result.data[$i] = $result.data[$i] * $scalarElement
+        }
+        $result.UpdateResolution()
+        return $result
+    }
+
+    # Element-wise multiplication (Hadamard product)
+    [BigMatrix] ElementwiseMultiply([BigMatrix] $other) {
+        if (-not $this.SameDimensions($other)) {
+            throw "Matrix dimensions must match for element-wise multiplication"
+        }
+
+        $result = $this.Clone()
+        for ($i = 0; $i -lt $result.totalElements; $i++) {
+            $result.data[$i] = ([BigFormula]"ValA*ValB").Evaluate(@{ ValA=$this.data[$i] ; ValB=$other.data[$i] })
+			# $result.data[$i] = $result.data[$i] * $other.data[$i]
+        }
+        $result.UpdateResolution()
+        return $result
+    }
+
+	# 1D Matrix multiplication
+    hidden static [BigMatrix] VectorDotProduct([BigMatrix] $a, [BigMatrix] $b) {
+        if ($a.effectiveRank -ne 1 -or $b.effectiveRank -ne 1) {
+            throw "Both matrices must be 1D matrices (Vector)"
+        }
+
+		# if (-not ($a.IsRowVector() -and $b.IsColumnVector())) {
+        #     throw "Matrix A must be a Single Row Matrix (Vector) and Matrix B must be a Single Column Matrix (Vector)"
+        # }
+
+        if ($a.totalElements -ne $b.totalElements) {
+            throw "Vector A size must equal Vector B size for Dot Product multiplication"
+        }
+
+        $sum = [BigComplex]0
+        for ($i = 0; $i -lt $a.totalElements; $i += 1) {
+			$product = ([BigFormula]"ValA*ValB").Evaluate(@{ ValA=$a.Data[$i] ; ValB=$b.Data[$i] })
+			$sum = $sum + $product
+        }
+
+        return [BigMatrix]@($sum)
+    }
+
+    # 2D Matrix multiplication
+    hidden static [BigMatrix] MatrixMultiply2D([BigMatrix] $a, [BigMatrix] $b) {
+        if ($a.effectiveRank -ne 2 -or $b.effectiveRank -ne 2) {
+            throw "Both matrices must be 2D for matrix multiplication"
+        }
+        
+        $aRows = $a.dimensions[0]
+        $aCols = $a.dimensions[1]
+        $bRows = $b.dimensions[0]
+        $bCols = $b.dimensions[1]
+
+        if ($aCols -ne $bRows) {
+            throw "Matrix A columns ($aCols) must equal Matrix B rows ($bRows) for multiplication"
+        }
+
+        # Determine result element type
+        # $resultType = if ($a.elementType -eq "BigComplex" -or $b.elementType -eq "BigComplex") { "BigComplex" } else { $a.elementType }
+        $result = [BigMatrix]::new($aRows, $bCols)
+
+        for ($i = 0; $i -lt $aRows; $i++) {
+            for ($j = 0; $j -lt $bCols; $j++) {
+                $sum = [BigComplex]0
+                
+                for ($k = 0; $k -lt $aCols; $k++) {
+                    $product = ([BigFormula]"ValA*ValB").Evaluate(@{ ValA=$a.Get($i, $k) ; ValB=$b.Get($k, $j) })
+                    $sum = $sum + $product
+                }
+                
+                $result.Set($i, $j, $sum)
+            }
+        }
+
+        return $result
+    }
+
+    #endregion Arithmetic Operations
+
+	# Transpose (for 0D (Scalar), 1D an 2D matrices)
+    [BigMatrix] Transpose() {
+        if ($this.effectiveRank -gt 2) {
+            throw "Transpose() only works for 0D (Scalar), 1D and 2D matrices"
+        }
+
+		if($this.IsScalar()) {
+			return $this.Clone()
+		}
+
+		if(($this.effectiveRank -eq 1) -and ($this.internalRank -le 2)) {
+			$transposedData = $this.data.Clone()
+
+			if ($this.internalRank -eq 1) {
+				# 1D Single row to become 1D Single column
+				return [BigMatrix]::new($transposedData, @(1, $this.totalElements))
+			} else {
+				# 1D Single column to become 1D Single row
+				return [BigMatrix]::new($transposedData, @($this.totalElements))
+			}	
+		}
+
+		if(($this.effectiveRank -eq 2) -and ($this.internalRank -eq 2)) {
+			# Find the effective 2D dimensions
+			$cursor = 0
+			$effectiveDim = New-Object int[] 2
+			for ($i = 0; ($i -lt $this.dimensions.Length) -and ($cursor -lt 2); $i += 1) {
+				if ($this.dimensions[$i] -ne 1) {
+					$effectiveDim[$cursor] = $this.dimensions[$i]
+					$cursor += 1
+				}
+			}
+			$transposedData = New-Object object[] $this.totalElements
+
+			for ($i = 0; $i -lt $effectiveDim[0]; $i++) {
+				for ($j = 0; $j -lt $effectiveDim[1]; $j++) {
+					$oldIndex = ($i * $effectiveDim[1]) + $j
+					$newIndex = ($j * $effectiveDim[0]) + $i
+					$transposedData[$newIndex] = $this.CloneElement($this.data[$oldIndex])
+				}
+			}
+			return [BigMatrix]::new($transposedData, @($effectiveDim[1], $effectiveDim[0]))
+		}
+		throw "Transpose() does not yet support higher dimensionality matrices"
+    }
+}
+
+# class BigMatrix : System.IFormattable, System.IComparable, System.IEquatable[object] {
+
+#     hidden [object[]] $data                    # Flattened array storage
+#     hidden [int[]] $dimensions                 # Shape of the matrix [rows, cols, depth, ...]
+#     hidden [int] $rank                         # Number of dimensions
+#     hidden [int] $totalElements               # Total number of elements
+#     hidden [System.Numerics.BigInteger] $maxDecimalResolution
+#     hidden [string] $elementType              # "BigNum", "BigComplex", or "Mixed"
+
+#     #region Constructors
+
+#     # BigMatrix : (dimensions, elementType) - Create zero matrix with specified dimensions
+#     BigMatrix([int[]] $dims, [string] $type = "BigComplex") {
+#         $this.InitMatrix($dims, $type, $null)
+#     }
+
+#     # BigMatrix : (rows, cols) - Create 2D zero matrix
+#     BigMatrix([int] $rows, [int] $cols, [string] $type = "BigComplex") {
+#         $this.InitMatrix(@($rows, $cols), $type, $null)
+#     }
+
+#     # BigMatrix : (data, dimensions) - Create matrix from data array
+#     BigMatrix([object[]] $inputData, [int[]] $dims, [string] $type = "BigComplex") {
+#         $this.InitMatrix($dims, $type, $inputData)
+#     }
+
+#     # BigMatrix : (2D array) - Create matrix from 2D array
+#     BigMatrix([object[][]] $array2D) {
+#         $rows = $array2D.Length
+#         $cols = if ($rows -gt 0) { $array2D[0].Length } else { 0 }
+        
+#         # Flatten the 2D array
+#         $flatData = @()
+#         for ($i = 0; $i -lt $rows; $i++) {
+#             for ($j = 0; $j -lt $cols; $j++) {
+#                 $flatData += $array2D[$i][$j]
+#             }
+#         }
+        
+#         $this.InitMatrix(@($rows, $cols), "BigComplex", $flatData)
+#     }
+
+# 	# BigMatrix : (Dimension-Blind Array) - Create a n-dimensional matrix from an array
+#     BigMatrix([object[]] $nDimArray) {
+# 		if ($null -eq $nDimArray) {
+# 			$nDimArray = @(0)
+# 		}
+
+# 		$this.InitMatrixFromArray($nDimArray)
+#     }
+
+#     # BigMatrix : (copy constructor)
+#     BigMatrix([BigMatrix] $other) {
+# 		$this.dimensions = $other.dimensions.Clone()
+# 		$this.rank = $other.rank
+# 		$this.totalElements = $other.totalElements
+# 		$this.maxDecimalResolution = $other.maxDecimalResolution
+# 		$this.elementType = $other.elementType
+# 		$this.data = New-Object object[] $this.totalElements
+		
+# 		for ($i = 0; $i -lt $this.totalElements; $i++) {
+# 			$this.data[$i] = $this.CloneElement($other.data[$i])
+# 		}
+#     }
+
+#     #endregion Constructors
+
+#     #region Initialization
+
+#     hidden [void] InitMatrix([int[]] $dims, [string] $type, [object[]] $inputData) {
+#         # Validate dimensions
+#         if ($dims.Length -eq 0) {
+#             throw "Matrix must have at least one dimension"
+#         }
+        
+#         foreach ($dim in $dims) {
+#             if ($dim -le 0) {
+#                 throw "All dimensions must be positive"
+#             }
+#         }
+
+#         $this.dimensions = $dims.Clone()
+#         $this.rank = $dims.Length
+#         $this.totalElements = 1
+#         foreach ($dim in $dims) {
+#             $this.totalElements *= $dim
+#         }
+        
+#         $this.elementType = $type
+#         $this.maxDecimalResolution = 50  # Default resolution
+#         $this.data = New-Object object[] $this.totalElements
+
+#         # Initialize with data or zeros
+#         if ($inputData) {
+#             if ($inputData.Length -ne $this.totalElements) {
+#                 throw "Input data length ($($inputData.Length)) doesn't match matrix size ($($this.totalElements))"
+#             }
+#             for ($i = 0; $i -lt $this.totalElements; $i++) {
+#                 $this.data[$i] = $this.ConvertElement($inputData[$i])
+#             }
+#         } else {
+#             # Initialize with zeros
+#             for ($i = 0; $i -lt $this.totalElements; $i++) {
+#                 $this.data[$i] = $this.GetZeroElement()
+#             }
+#         }
+        
+#         $this.UpdateResolution()
+#     }
+
+# 	hidden [void] InitMatrixFromArray([object[]] $nDimArray) {
+# 		if ($null -eq $nDimArray -or $nDimArray.Length -eq 0) {
+#             throw "Input array cannot be null or empty"
+#         }
+
+# 		# First, determine the rank and dimensions
+#         $this.rank = [BigMatrix]::RecurseCountRank($nDimArray)
+#         $this.dimensions = New-Object int[] $this.rank
+
+#         # Calculate dimensions at each level
+#         [BigMatrix]::RecurseCalculateDimensions($nDimArray, $this.dimensions, 0)
+
+#         $this.totalElements = 1
+#         foreach ($dim in $this.dimensions) {
+#             $this.totalElements *= $dim
+#         }
+        
+#         $this.elementType = "Mixed"
+#         $this.maxDecimalResolution = 50  # Default resolution
+#         $this.data = New-Object object[] $this.totalElements
+
+#         # Initialize with zeros
+# 		for ($i = 0; $i -lt $this.totalElements; $i++) {
+# 			$this.data[$i] = $this.GetZeroElement()
+# 		}
+
+# 		# Recursively populate the matrix
+#         $multiDimCursor = New-Object int[] $this.rank
+#         $this.RecurseSetElement($nDimArray, $multiDimCursor, 0)
+        
+#         $this.UpdateResolution()
+#     }
+
+# 	hidden static [int] RecurseCountRank([object[]] $matrixArray) {
+#         [int] $hasNextLevel = 0
+#         [int] $maxRecurs = 0
+#         [int] $tmpRecurs = 0
+        
+#         foreach ($elem in $matrixArray) {
+#             if ($elem -is [System.Object[]] -or $elem -is [System.Array]) {
+#                 $hasNextLevel = 1
+#                 $tmpRecurs = [BigMatrix]::RecurseCountRank([object[]]$elem)
+#                 if ($tmpRecurs -gt $maxRecurs) { 
+#                     $maxRecurs = $tmpRecurs 
+#                 }
+#             }
+#         }
+        
+#         if ($hasNextLevel -eq 0) {
+#             return 1
+#         }
+#         return ($maxRecurs + 1)
+#     }
+
+# 	# Helper method to detect empty nested structures created by PowerShell comma parsing
+#     hidden static [bool] IsEmptyNestedStructure([object[]] $array) {
+#         if ($array.Length -eq 0) {
+#             return $true
+#         }
+        
+#         # If array has only one element and it's another array, check recursively
+#         if ($array.Length -eq 1 -and ($array[0] -is [System.Object[]] -or $array[0] -is [System.Array])) {
+#             return [BigMatrix]::IsEmptyNestedStructure([object[]]$array[0])
+#         }
+        
+#         # Check if all elements are empty arrays
+#         foreach ($elem in $array) {
+#             if ($elem -is [System.Object[]] -or $elem -is [System.Array]) {
+#                 if (-not [BigMatrix]::IsEmptyNestedStructure([object[]]$elem)) {
+#                     return $false
+#                 }
+#             } else {
+#                 # Found a non-array element, so not empty
+#                 return $false
+#             }
+#         }
+        
+#         return $true
+#     }
+
+# 	hidden static [void] RecurseCalculateDimensions([object[]] $matrixArray, [int[]] $dimensions, [int] $currentLevel) {
+#         if ($currentLevel -ge $dimensions.Length) {
+#             return
+#         }
+        
+#         # Set the dimension at this level
+#         $dimensions[$currentLevel] = $matrixArray.Length
+        
+#         # If there's a next level, recurse into the first non-null element
+#         if ($currentLevel + 1 -lt $dimensions.Length) {
+#             foreach ($elem in $matrixArray) {
+#                 if ($elem -is [System.Object[]] -or $elem -is [System.Array]) {
+#                     [BigMatrix]::RecurseCalculateDimensions([object[]]$elem, $dimensions, $currentLevel + 1)
+#                     break  # Only need to check the first sub-array to get dimensions
+#                 }
+#             }
+#         }
+#     }
+
+# 	hidden [void] RecurseSetElement([object[]] $currentArray, [int[]] $multiDimCursor, [int] $currentLevel) {
+#         if ($currentLevel -ge $this.rank) {
+#             return
+#         }
+        
+#         for ($i = 0; $i -lt $currentArray.Length -and $i -lt $this.dimensions[$currentLevel]; $i++) {
+#             $multiDimCursor[$currentLevel] = $i
+#             $elem = $currentArray[$i]
+            
+#             if ($elem -is [System.Object[]] -or $elem -is [System.Array]) {
+#                 # Recurse deeper
+#                 if ($currentLevel + 1 -lt $this.rank) {
+#                     $this.RecurseSetElement([object[]]$elem, $multiDimCursor, $currentLevel + 1)
+#                 }
+#             } else {
+#                 # This is a leaf element - set it in the matrix
+#                 if ($currentLevel -eq ($this.rank - 1)) {
+#                     # We're at the deepest level, set the element
+#                     $flatIndex = $this.GetFlatIndexFromCursor($multiDimCursor)
+#                     if ($flatIndex -lt $this.totalElements) {
+#                         $this.data[$flatIndex] = $this.ConvertElement($elem)
+#                     }
+#                 } else {
+#                     # We hit a scalar before reaching the expected depth
+#                     # Treat this as if we're at the deepest level for this branch
+#                     $tempCursor = New-Object int[] $this.rank
+#                     for ($j = 0; $j -le $currentLevel; $j++) {
+#                         $tempCursor[$j] = $multiDimCursor[$j]
+#                     }
+#                     # Fill remaining dimensions with 0
+#                     for ($j = $currentLevel + 1; $j -lt $this.rank; $j++) {
+#                         $tempCursor[$j] = 0
+#                     }
+#                     $flatIndex = $this.GetFlatIndexFromCursor($tempCursor)
+#                     if ($flatIndex -lt $this.totalElements) {
+#                         $this.data[$flatIndex] = $this.ConvertElement($elem)
+#                     }
+#                 }
+#             }
+#         }
+# 	}
+
+# 	hidden [int] GetFlatIndexFromCursor([int[]] $cursor) {
+#         if ($cursor.Length -ne $this.rank) {
+#             throw "Cursor array length ($($cursor.Length)) doesn't match matrix rank ($($this.rank))"
+#         }
+
+#         # Convert multi-dimensional cursor to flat index (row-major order)
+#         [int] $flatIndex = 0
+#         [int] $multiplier = 1
+        
+#         for ($i = $this.rank - 1; $i -ge 0; $i--) {
+#             # Ensure we don't go out of bounds
+#             $clampedIndex = [Math]::Min($cursor[$i], $this.dimensions[$i] - 1)
+#             $clampedIndex = [Math]::Max($clampedIndex, 0)
+            
+#             $flatIndex += $clampedIndex * $multiplier
+#             $multiplier *= $this.dimensions[$i]
+#         }
+        
+#         return $flatIndex
+#     }
+
+#     hidden [object] ConvertElement([object] $element) {
+#         switch ($this.elementType) {
+#             "BigNum" {
+#                 if ($element -is [BigNum]) { return $element.Clone() }
+#                 return [BigNum]::new($element)
+#             }
+#             "BigComplex" {
+#                 if ($element -is [BigComplex]) { return $element.Clone() }
+#                 if ($element -is [BigNum]) { return [BigComplex]::new($element) }
+#                 return [BigComplex]::new($element)
+#             }
+#             "Mixed" {
+#                 if ($element -is [BigNum] -or $element -is [BigComplex]) {
+#                     return $element.Clone()
+#                 }
+#                 # Default to BigComplex for other types
+#                 return [BigComplex]::new($element)
+#             }
+#         }
+#         throw "Unknown element type: $($this.elementType)"
+#     }
+
+#     hidden [object] GetZeroElement() {
+#         switch ($this.elementType) {
+#             "BigNum" { return [BigNum]::new(0) }
+#             "BigComplex" { return [BigComplex]::new(0) }
+#             "Mixed" { return [BigNum]::new(0) }
+#         }
+#         throw "Unknown element type: $($this.elementType)"
+#     }
+
+#     hidden [object] CloneElement([object] $element) {
+#         if ($element -is [BigNum]) { return $element.Clone() }
+#         if ($element -is [BigComplex]) { return $element.Clone() }
+#         return $element
+#     }
+
+#     hidden [void] UpdateResolution() {
+#         $maxRes = 0
+#         for ($i = 0; $i -lt $this.totalElements; $i++) {
+#             $elem = $this.data[$i]
+#             if ($elem -is [BigNum]) {
+#                 $maxRes = [Math]::Max($maxRes, $elem.GetMaxDecimalResolution())
+#             } elseif ($elem -is [BigComplex]) {
+#                 $maxRes = [Math]::Max($maxRes, $elem.GetMaxDecimalResolution())
+#             }
+#         }
+#         $this.maxDecimalResolution = $maxRes
+#     }
+
+#     #endregion Initialization
+
+#     #region Indexing and Access
+
+#     # Get/Set element by indices
+#     [object] Get([int[]] $indices) {
+#         $flatIndex = $this.GetFlatIndex($indices)
+#         return $this.data[$flatIndex]
+#     }
+
+#     [void] Set([int[]] $indices, [object] $value) {
+#         $flatIndex = $this.GetFlatIndex($indices)
+#         $this.data[$flatIndex] = $this.ConvertElement($value)
+#         $this.UpdateResolution()
+#     }
+
+# 	# Get submatrix by fixing certain dimensions
+#     [BigMatrix] GetSubmatrix([int[]] $fixedIndices) {
+#         if ($null -eq $fixedIndices -or $fixedIndices.Length -eq 0) {
+#             throw "Fixed indices array cannot be null or empty"
+#         }
+        
+# 		if ($fixedIndices.Length -eq $this.rank) {
+# 			$tmpArray = @($this.Get($fixedIndices))
+#             return [BigMatrix]::new($tmpArray)
+#         }
+
+#         if ($fixedIndices.Length -gt $this.rank) {
+#             throw "Cannot fix $($fixedIndices.Length) indices in a $($this.rank)-dimensional matrix"
+#         }
+
+#         # Validate fixed indices are within bounds
+#         for ($i = 0; $i -lt $fixedIndices.Length; $i++) {
+#             if ($fixedIndices[$i] -lt 0 -or $fixedIndices[$i] -ge $this.dimensions[$i]) {
+#                 throw "Fixed index $($fixedIndices[$i]) out of bounds for dimension $i (size: $($this.dimensions[$i]))"
+#             }
+#         }
+
+#         # Calculate dimensions of the resulting submatrix
+#         $subRank = $this.rank - $fixedIndices.Length
+#         $subDimensions = New-Object int[] $subRank
+#         for ($i = 0; $i -lt $subRank; $i++) {
+#             $subDimensions[$i] = $this.dimensions[$fixedIndices.Length + $i]
+#         }
+
+#         # Calculate total elements in submatrix
+#         $subTotalElements = 1
+#         foreach ($dim in $subDimensions) {
+#             $subTotalElements *= $dim
+#         }
+
+#         # Extract data for the submatrix
+#         $subData = New-Object object[] $subTotalElements
+#         $subIndex = 0
+
+#         # Generate all possible combinations of the remaining indices
+#         $this.ExtractSubmatrixData($fixedIndices, @(), 0, $subData, [ref]$subIndex)
+
+#         return [BigMatrix]::new($subData, $subDimensions, $this.elementType)
+#     }
+
+#     # Recursive helper to extract submatrix data
+#     hidden [void] ExtractSubmatrixData([int[]] $fixedIndices, [int[]] $currentIndices, [int] $currentDim, [object[]] $subData, [ref] $subIndex) {
+#         # $totalDims = $fixedIndices.Length + ($this.rank - $fixedIndices.Length)
+        
+#         if ($currentDim -eq ($this.rank - $fixedIndices.Length)) {
+#             # We've built a complete set of free indices, now extract the element
+#             $fullIndices = New-Object int[] $this.rank
+            
+#             # Copy fixed indices
+#             for ($i = 0; $i -lt $fixedIndices.Length; $i++) {
+#                 $fullIndices[$i] = $fixedIndices[$i]
+#             }
+            
+#             # Copy current (free) indices
+#             for ($i = 0; $i -lt $currentIndices.Length; $i++) {
+#                 $fullIndices[$fixedIndices.Length + $i] = $currentIndices[$i]
+#             }
+            
+#             # Extract the element
+#             $subData[$subIndex.Value] = $this.CloneElement($this.Get($fullIndices))
+#             $subIndex.Value++
+#             return
+#         }
+
+#         # Recursively iterate through the current free dimension
+#         $dimIndex = $fixedIndices.Length + $currentDim
+#         for ($i = 0; $i -lt $this.dimensions[$dimIndex]; $i++) {
+#             $newIndices = $currentIndices + @($i)
+#             $this.ExtractSubmatrixData($fixedIndices, $newIndices, $currentDim + 1, $subData, $subIndex)
+#         }
+#     }
+
+#     # Convenience method for getting a slice at a specific position in the first dimension
+#     [BigMatrix] GetSlice([int] $sliceIndex) {
+#         return $this.GetSubmatrix(@($sliceIndex))
+#     }
+
+#     # Get multiple slices along the first dimension (returns single matrix with selected slices)
+#     [BigMatrix] GetSlices([int[]] $sliceIndices) {
+#         if ($null -eq $sliceIndices -or $sliceIndices.Length -eq 0) {
+#             throw "Slice indices array cannot be null or empty"
+#         }
+
+#         # Validate all slice indices
+#         foreach ($index in $sliceIndices) {
+#             if ($index -lt 0 -or $index -ge $this.dimensions[0]) {
+#                 throw "Slice index $index out of bounds for first dimension (size: $($this.dimensions[0]))"
+#             }
+#         }
+
+#         # Create new dimensions - same rank, but first dimension is the number of selected slices
+#         $newDimensions = $this.dimensions.Clone()
+#         $newDimensions[0] = $sliceIndices.Length
+
+#         # Calculate total elements in the new matrix
+#         $newTotalElements = 1
+#         foreach ($dim in $newDimensions) {
+#             $newTotalElements *= $dim
+#         }
+
+#         # Extract data for selected slices
+#         $newData = New-Object object[] $newTotalElements
+#         $newIndex = 0
+
+#         # Calculate elements per slice (product of all dimensions except the first)
+#         $elementsPerSlice = 1
+#         for ($i = 1; $i -lt $this.rank; $i++) {
+#             $elementsPerSlice *= $this.dimensions[$i]
+#         }
+
+#         # Copy data for each requested slice
+#         foreach ($sliceIndex in $sliceIndices) {
+#             # Calculate starting position in original data for this slice
+#             $originalStartIndex = $sliceIndex * $elementsPerSlice
+            
+#             # Copy all elements from this slice
+#             for ($i = 0; $i -lt $elementsPerSlice; $i++) {
+#                 $newData[$newIndex] = $this.CloneElement($this.data[$originalStartIndex + $i])
+#                 $newIndex++
+#             }
+#         }
+
+#         return [BigMatrix]::new($newData, $newDimensions, $this.elementType)
+#     }
+
+#     # Get/Set for 2D matrices (convenience)
+#     [object] Get([int] $row, [int] $col) {
+#         if ($this.rank -ne 2) {
+#             throw "Matrix is not 2D. Use Get([int[]]) for multi-dimensional access."
+#         }
+#         return $this.Get(@($row, $col))
+#     }
+
+#     [void] Set([int] $row, [int] $col, [object] $value) {
+#         if ($this.rank -ne 2) {
+#             throw "Matrix is not 2D. Use Set([int[]], [object]) for multi-dimensional access."
+#         }
+#         $this.Set(@($row, $col), $value)
+#     }
+
+#     hidden [int] GetFlatIndex([int[]] $indices) {
+#         if ($indices.Length -ne $this.rank) {
+#             throw "Index array length ($($indices.Length)) doesn't match matrix rank ($($this.rank))"
+#         }
+
+#         # Validate bounds
+#         for ($i = 0; $i -lt $this.rank; $i++) {
+#             if ($indices[$i] -lt 0 -or $indices[$i] -ge $this.dimensions[$i]) {
+#                 throw "Index $($indices[$i]) out of bounds for dimension $i (size: $($this.dimensions[$i]))"
+#             }
+#         }
+
+#         # Convert multi-dimensional index to flat index (row-major order)
+#         $flatIndex = 0
+#         $multiplier = 1
+#         for ($i = $this.rank - 1; $i -ge 0; $i--) {
+#             $flatIndex += $indices[$i] * $multiplier
+#             $multiplier *= $this.dimensions[$i]
+#         }
+        
+#         return $flatIndex
+#     }
+
+#     #endregion Indexing and Access
+
+#     #region Properties and Info
+
+#     [int[]] GetShape() { return $this.dimensions.Clone() }
+#     [int] GetRank() { return $this.rank }
+#     [int] GetTotalElements() { return $this.totalElements }
+#     [string] GetElementType() { return $this.elementType }
+#     [System.Numerics.BigInteger] GetMaxDecimalResolution() { return $this.maxDecimalResolution }
+
+#     # Get row/column for 2D matrices
+#     [BigMatrix] GetRow([int] $rowIndex) {
+#         if ($this.rank -ne 2) {
+#             throw "GetRow() only works for 2D matrices"
+#         }
+#         if ($rowIndex -lt 0 -or $rowIndex -ge $this.dimensions[0]) {
+#             throw "Row index out of bounds"
+#         }
+
+#         $cols = $this.dimensions[1]
+#         $rowData = New-Object object[] $cols
+#         for ($j = 0; $j -lt $cols; $j++) {
+#             $rowData[$j] = $this.Get($rowIndex, $j)
+#         }
+        
+#         return [BigMatrix]::new($rowData, @(1, $cols), $this.elementType)
+#     }
+
+#     [BigMatrix] GetColumn([int] $colIndex) {
+#         if ($this.rank -ne 2) {
+#             throw "GetColumn() only works for 2D matrices"
+#         }
+#         if ($colIndex -lt 0 -or $colIndex -ge $this.dimensions[1]) {
+#             throw "Column index out of bounds"
+#         }
+
+#         $rows = $this.dimensions[0]
+#         $colData = New-Object object[] $rows
+#         for ($i = 0; $i -lt $rows; $i++) {
+#             $colData[$i] = $this.Get($i, $colIndex)
+#         }
+        
+#         return [BigMatrix]::new($colData, @($rows, 1), $this.elementType)
+#     }
+
+#     #endregion Properties and Info
+
+#     #region Basic Operations
+
+#     # Clone
+#     [BigMatrix] Clone() {
+#         return [BigMatrix]::new($this)
+#     }
+
+#     # Resize with new resolution
+#     [BigMatrix] CloneWithNewResolution([System.Numerics.BigInteger] $newRes) {
+#         $clone = $this.Clone()
+#         for ($i = 0; $i -lt $clone.totalElements; $i++) {
+#             $elem = $clone.data[$i]
+#             if ($elem -is [BigNum]) {
+#                 $clone.data[$i] = $elem.CloneWithNewResolution($newRes)
+#             } elseif ($elem -is [BigComplex]) {
+#                 $clone.data[$i] = $elem.CloneWithNewResolution($newRes)
+#             }
+#         }
+#         $clone.maxDecimalResolution = $newRes
+#         return $clone
+#     }
+
+#     # Transpose (for 1D an 2D matrices)
+#     [BigMatrix] Transpose() {
+#         if ($this.rank -gt 2) {
+#             throw "Transpose() only works for 1D and 2D matrices"
+#         }
+
+# 		if($this.rank -eq 1) {
+# 			throw "Transpose() on 1D matrices not yet implemented"
+# 		} else {
+# 			$rows = $this.dimensions[0]
+# 			$cols = $this.dimensions[1]
+# 			$transposedData = New-Object object[] $this.totalElements
+
+# 			for ($i = 0; $i -lt $rows; $i++) {
+# 				for ($j = 0; $j -lt $cols; $j++) {
+# 					$oldIndex = $i * $cols + $j
+# 					$newIndex = $j * $rows + $i
+# 					$transposedData[$newIndex] = $this.CloneElement($this.data[$oldIndex])
+# 				}
+# 			}
+# 		}
+
+#         return [BigMatrix]::new($transposedData, @($cols, $rows), $this.elementType)
+#     }
+
+#     #endregion Basic Operations
+
+#     #region Arithmetic Operations
+
+#     # Addition
+#     static [BigMatrix] op_Addition([BigMatrix] $a, [BigMatrix] $b) {
+#         if (-not $a.SameDimensions($b)) {
+#             throw "Matrix dimensions must match for addition"
+#         }
+
+#         $result = $a.Clone()
+#         for ($i = 0; $i -lt $result.totalElements; $i++) {
+#             $result.data[$i] = $result.AddElements($result.data[$i], $b.data[$i])
+#         }
+#         $result.UpdateResolution()
+#         return $result
+#     }
+
+#     # Subtraction
+#     static [BigMatrix] op_Subtraction([BigMatrix] $a, [BigMatrix] $b) {
+#         if (-not $a.SameDimensions($b)) {
+#             throw "Matrix dimensions must match for subtraction"
+#         }
+
+#         $result = $a.Clone()
+#         for ($i = 0; $i -lt $result.totalElements; $i++) {
+#             $result.data[$i] = $result.SubtractElements($result.data[$i], $b.data[$i])
+#         }
+#         $result.UpdateResolution()
+#         return $result
+#     }
+
+#     # Matrix multiplication
+#     static [BigMatrix] op_Multiply([BigMatrix] $a, [BigMatrix] $b) {
+#         # Handle different cases: scalar, vector, matrix multiplication
+#         if ($a.rank -eq 2 -and $b.rank -eq 2) {
+#             return [BigMatrix]::MatrixMultiply2D($a, $b)
+#         } elseif ($a.rank -eq 1 -or $b.rank -eq 1) {
+#             throw "Vector multiplication not yet implemented"
+#         } else {
+#             throw "Multiplication not supported for matrices with rank > 2"
+#         }
+#     }
+
+#     # Scalar multiplication
+#     [BigMatrix] ScalarMultiply([object] $scalar) {
+#         $result = $this.Clone()
+#         $scalarElement = $this.ConvertElement($scalar)
+        
+#         for ($i = 0; $i -lt $result.totalElements; $i++) {
+#             $result.data[$i] = $result.MultiplyElements($result.data[$i], $scalarElement)
+#         }
+#         $result.UpdateResolution()
+#         return $result
+#     }
+
+#     # Element-wise multiplication (Hadamard product)
+#     [BigMatrix] ElementwiseMultiply([BigMatrix] $other) {
+#         if (-not $this.SameDimensions($other)) {
+#             throw "Matrix dimensions must match for element-wise multiplication"
+#         }
+
+#         $result = $this.Clone()
+#         for ($i = 0; $i -lt $result.totalElements; $i++) {
+#             $result.data[$i] = $result.MultiplyElements($result.data[$i], $other.data[$i])
+#         }
+#         $result.UpdateResolution()
+#         return $result
+#     }
+
+#     # 2D Matrix multiplication
+#     hidden static [BigMatrix] MatrixMultiply2D([BigMatrix] $a, [BigMatrix] $b) {
+#         if ($a.rank -ne 2 -or $b.rank -ne 2) {
+#             throw "Both matrices must be 2D for matrix multiplication"
+#         }
+        
+#         $aRows = $a.dimensions[0]
+#         $aCols = $a.dimensions[1]
+#         $bRows = $b.dimensions[0]
+#         $bCols = $b.dimensions[1]
+
+#         if ($aCols -ne $bRows) {
+#             throw "Matrix A columns ($aCols) must equal Matrix B rows ($bRows) for multiplication"
+#         }
+
+#         # Determine result element type
+#         $resultType = if ($a.elementType -eq "BigComplex" -or $b.elementType -eq "BigComplex") { "BigComplex" } else { $a.elementType }
+#         $result = [BigMatrix]::new($aRows, $bCols, $resultType)
+
+#         for ($i = 0; $i -lt $aRows; $i++) {
+#             for ($j = 0; $j -lt $bCols; $j++) {
+#                 $sum = $result.GetZeroElement()
+                
+#                 for ($k = 0; $k -lt $aCols; $k++) {
+#                     $aElement = $a.Get($i, $k)
+#                     $bElement = $b.Get($k, $j)
+#                     $product = $result.MultiplyElements($aElement, $bElement)
+#                     $sum = $result.AddElements($sum, $product)
+#                 }
+                
+#                 $result.Set($i, $j, $sum)
+#             }
+#         }
+
+#         return $result
+#     }
+
+#     #endregion Arithmetic Operations
+
+#     #region Element Operations
+
+#     hidden [object] AddElements([object] $a, [object] $b) {
+#         if ($a -is [BigNum] -and $b -is [BigNum]) {
+#             return $a + $b
+#         } elseif ($a -is [BigComplex] -and $b -is [BigComplex]) {
+#             return $a + $b
+#         } elseif ($a -is [BigNum] -and $b -is [BigComplex]) {
+#             return ([BigComplex]::new($a)) + $b
+#         } elseif ($a -is [BigComplex] -and $b -is [BigNum]) {
+#             return $a + ([BigComplex]::new($b))
+#         }
+#         throw "Unsupported element types for addition"
+#     }
+
+#     hidden [object] SubtractElements([object] $a, [object] $b) {
+#         if ($a -is [BigNum] -and $b -is [BigNum]) {
+#             return $a - $b
+#         } elseif ($a -is [BigComplex] -and $b -is [BigComplex]) {
+#             return $a - $b
+#         } elseif ($a -is [BigNum] -and $b -is [BigComplex]) {
+#             return ([BigComplex]::new($a)) - $b
+#         } elseif ($a -is [BigComplex] -and $b -is [BigNum]) {
+#             return $a - ([BigComplex]::new($b))
+#         }
+#         throw "Unsupported element types for subtraction"
+#     }
+
+#     hidden [object] MultiplyElements([object] $a, [object] $b) {
+#         if ($a -is [BigNum] -and $b -is [BigNum]) {
+#             return $a * $b
+#         } elseif ($a -is [BigComplex] -and $b -is [BigComplex]) {
+#             return $a * $b
+#         } elseif ($a -is [BigNum] -and $b -is [BigComplex]) {
+#             return ([BigComplex]::new($a)) * $b
+#         } elseif ($a -is [BigComplex] -and $b -is [BigNum]) {
+#             return $a * ([BigComplex]::new($b))
+#         }
+#         throw "Unsupported element types for multiplication"
+#     }
+
+#     #endregion Element Operations
+
+#     #region Matrix Operations
+
+#     # Determinant (2D only)
+#     [object] Determinant() {
+#         if ($this.rank -ne 2) {
+#             throw "Determinant only works for 2D matrices"
+#         }
+        
+#         $rows = $this.dimensions[0]
+#         $cols = $this.dimensions[1]
+        
+#         if ($rows -ne $cols) {
+#             throw "Determinant requires a square matrix"
+#         }
+
+#         if ($rows -eq 1) {
+#             return $this.Get(0, 0)
+#         } elseif ($rows -eq 2) {
+#             return $this.SubtractElements(
+#                 $this.MultiplyElements($this.Get(0, 0), $this.Get(1, 1)),
+#                 $this.MultiplyElements($this.Get(0, 1), $this.Get(1, 0))
+#             )
+#         } else {
+#             # Use cofactor expansion along first row
+#             $det = $this.GetZeroElement()
+#             for ($j = 0; $j -lt $cols; $j++) {
+#                 $minor = $this.GetMinor(0, $j)
+#                 $cofactor = $minor.Determinant()
+                
+#                 if ($j % 2 -eq 1) {
+#                     $cofactor = $this.MultiplyElements($cofactor, $this.ConvertElement(-1))
+#                 }
+                
+#                 $term = $this.MultiplyElements($this.Get(0, $j), $cofactor)
+#                 $det = $this.AddElements($det, $term)
+#             }
+#             return $det
+#         }
+#     }
+
+#     # Get minor matrix (remove row i, column j)
+#     hidden [BigMatrix] GetMinor([int] $excludeRow, [int] $excludeCol) {
+#         if ($this.rank -ne 2) {
+#             throw "GetMinor only works for 2D matrices"
+#         }
+
+#         $rows = $this.dimensions[0]
+#         $cols = $this.dimensions[1]
+#         $newSize = ($rows - 1) * ($cols - 1)
+#         $minorData = New-Object object[] $newSize
+#         $index = 0
+
+#         for ($i = 0; $i -lt $rows; $i++) {
+#             if ($i -eq $excludeRow) { continue }
+#             for ($j = 0; $j -lt $cols; $j++) {
+#                 if ($j -eq $excludeCol) { continue }
+#                 $minorData[$index++] = $this.Get($i, $j)
+#             }
+#         }
+
+#         return [BigMatrix]::new($minorData, @($rows - 1, $cols - 1), $this.elementType)
+#     }
+
+#     # Identity matrix
+#     static [BigMatrix] Identity([int] $size, [string] $type = "BigNum") {
+#         $identity = [BigMatrix]::new($size, $size, $type)
+#         for ($i = 0; $i -lt $size; $i++) {
+#             $identity.Set($i, $i, 1)
+#         }
+#         return $identity
+#     }
+
+#     # Zero matrix
+#     static [BigMatrix] Zero([int[]] $dims, [string] $type = "BigNum") {
+#         return [BigMatrix]::new($dims, $type)
+#     }
+
+#     # Ones matrix
+#     static [BigMatrix] Ones([int[]] $dims, [string] $type = "BigNum") {
+#         $ones = [BigMatrix]::new($dims, $type)
+#         for ($i = 0; $i -lt $ones.totalElements; $i++) {
+#             $ones.data[$i] = $ones.ConvertElement(1)
+#         }
+#         return $ones
+#     }
+
+#     #endregion Matrix Operations
+
+#     #region Utility Methods
+
+#     hidden [bool] SameDimensions([BigMatrix] $other) {
+#         if ($this.rank -ne $other.rank) { return $false }
+#         for ($i = 0; $i -lt $this.rank; $i++) {
+#             if ($this.dimensions[$i] -ne $other.dimensions[$i]) { return $false }
+#         }
+#         return $true
+#     }
+
+#     #endregion Utility Methods
+
+#     #region Standard Interface Implementations
+
+#     # IComparable - Compare by Frobenius norm
+#     [int] CompareTo([object] $other) {
+#         if ($null -eq $other) { return 1 }
+#         if ($other -isnot [BigMatrix]) { return 1 }
+        
+#         $thisNorm = $this.FrobeniusNorm()
+#         $otherNorm = ([BigMatrix]$other).FrobeniusNorm()
+        
+#         if ($thisNorm -eq $otherNorm) { return 0 }
+#         if ($thisNorm -lt $otherNorm) { return -1 }
+#         return 1
+#     }
+
+#     # IEquatable
+#     [bool] Equals([object] $other) {
+#         if ($null -eq $other -or $other -isnot [BigMatrix]) { return $false }
+        
+#         $otherMatrix = [BigMatrix]$other
+#         if (-not $this.SameDimensions($otherMatrix)) { return $false }
+        
+#         for ($i = 0; $i -lt $this.totalElements; $i++) {
+#             if (-not $this.data[$i].Equals($otherMatrix.data[$i])) {
+#                 return $false
+#             }
+#         }
+#         return $true
+#     }
+
+#     [int] GetHashCode() {
+#         return $this.ToString().GetHashCode()
+#     }
+
+#     # Frobenius norm (for comparison)
+#     hidden [object] FrobeniusNorm() {
+#         $sum = $this.GetZeroElement()
+#         for ($i = 0; $i -lt $this.totalElements; $i++) {
+#             $elem = $this.data[$i]
+#             if ($elem -is [BigNum]) {
+#                 $sum = $this.AddElements($sum, $elem * $elem)
+#             } elseif ($elem -is [BigComplex]) {
+#                 $magnitude = $elem.Magnitude()
+#                 $sum = $this.AddElements($sum, $magnitude * $magnitude)
+#             }
+#         }
+        
+#         if ($sum -is [BigNum]) {
+#             return [BigNum]::Sqrt($sum)
+#         } else {
+#             return [BigComplex]::Sqrt($sum)
+#         }
+#     }
+
+#     #endregion Standard Interface Implementations
+
+#     #region String Representation
+
+#     [string] ToString() {
+#         return $this.ToString("G", (Get-Culture))
+#     }
+
+#     [string] ToString([string] $format) {
+#         return $this.ToString($format, (Get-Culture))
+#     }
+
+#     [string] ToString([IFormatProvider] $provider) {
+#         return $this.ToString("G", $provider)
+#     }
+
+#     [string] ToString([string] $format, [IFormatProvider] $provider) {
+#         if ($this.rank -eq 1) {
+#             return $this.ToString1D($format, $provider)
+#         } elseif ($this.rank -eq 2) {
+#             return $this.ToString2D($format, $provider)
+#         } else {
+#             return $this.ToStringND($format, $provider)
+#         }
+#     }
+
+#     hidden [string] ToString1D([string] $format, [IFormatProvider] $provider) {
+#         $elements = @()
+#         for ($i = 0; $i -lt $this.dimensions[0]; $i++) {
+#             $elem = $this.data[$i]
+#             if ($elem -is [BigNum] -or $elem -is [BigComplex]) {
+#                 $elements += $elem.ToString($format, $provider)
+#             } else {
+#                 $elements += $elem.ToString()
+#             }
+#         }
+#         return "[" + ($elements -join ", ") + "]"
+#     }
+
+#     hidden [string] ToString2D([string] $format, [IFormatProvider] $provider) {
+#         $rows = $this.dimensions[0]
+#         $cols = $this.dimensions[1]
+#         $lines = @()
+        
+#         for ($i = 0; $i -lt $rows; $i++) {
+#             $rowElements = @()
+#             for ($j = 0; $j -lt $cols; $j++) {
+#                 $elem = $this.Get($i, $j)
+#                 if ($elem -is [BigNum] -or $elem -is [BigComplex]) {
+#                     $rowElements += $elem.ToString($format, $provider)
+#                 } else {
+#                     $rowElements += $elem.ToString()
+#                 }
+#             }
+#             $lines += "[" + ($rowElements -join ", ") + "]"
+#         }
+        
+#         return "[" + ($lines -join ",`n ") + "]"
+#     }
+
+#     hidden [string] ToStringND([string] $format, [IFormatProvider] $provider) {
+#         $dimStr = "(" + ($this.dimensions -join " x ") + ")"
+#         return "BigMatrix $dimStr with $($this.totalElements) elements"
+#     }
+
+#     #endregion String Representation
+# }
+
 class BigFormula : System.IFormattable {
     hidden [string]                              $sourceExpr
     hidden [System.Numerics.BigInteger]          $targetResolution
@@ -28,6 +1847,11 @@ class BigFormula : System.IFormattable {
 	}
 
 	BigFormula([BigFormula] $bigFormula) {
+		if ($null -eq $bigFormula) {
+			$tmpFormula = [BigFormula]"0"
+			$bigFormula = $tmpFormula
+		}
+		
 		$this.sourceExpr = $bigFormula.sourceExpr.Clone()
 		$this.targetResolution = [System.Numerics.BigInteger]::parse($bigFormula.targetResolution)
 		$this.Rpn = $bigFormula.Rpn.Clone()
@@ -930,13 +2754,30 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# BigComplex : (BigComplex) Standard BigComplex Constructor.
 	BigComplex([BigComplex]$newVal) {
+		if ($null -eq $newVal) {
+			$tmpComplex = [BigComplex]0
+			$newVal = $tmpComplex
+		}
+
         $this.Init($newVal.realPart,$newVal.imaginaryPart)
     }
 
 	# BigComplex : (BigFormula) Standard BigFormula Constructor.
 	BigComplex([BigFormula]$objFormula) {
         $newVal = $objFormula.Evaluate()
-        $this.Init($newVal.realPart,$newVal.imaginaryPart)
+        $this.Init($newVal.realPart, $newVal.imaginaryPart)
+    }
+
+	# BigComplex : (BigMatrix) Standard BigMatrix Constructor, only for rank-1 Matrices with only one element.
+	BigComplex([BigMatrix]$objMatrix) {
+		if ($objMatrix.GetRank() -ne 1) {
+			throw "Autocasting Matrix to BigComplex only is possible for rank-1 matrices"
+		}
+		if ($objMatrix.GetTotalElements() -ne 1) {
+			throw "Autocasting Matrix to BigComplex only is possible for single entry matrices"
+		}
+		$tmp = [BigComplex]($objMatrix.Get(0))
+		$this.Init($tmp.realPart, $tmp.imaginaryPart)
     }
 
 	# BigComplex : (BigInteger,BigInteger) Standard Constructor for a BigInteger based complex number.
@@ -953,6 +2794,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	BigComplex() {
 		$this.Init(0,0)
     }
+
 	# BigComplex : () Standard Empty Constructor, returns a null BigComplex.
 	BigComplex([string]$val) {
 		$this.extractFromString($val)
@@ -1052,9 +2894,9 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 		return $newRes
 	}
 
-	# getDecimalExpantionLength : returns the current decimal expansion of the BigNum.
-	[System.Numerics.BigInteger]getDecimalExpantionLength(){
-		return [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpantionLength(),$this.imaginaryPart.getDecimalExpantionLength())
+	# getDecimalExpansionLength : returns the current decimal expansion of the BigNum.
+	[System.Numerics.BigInteger]getDecimalExpansionLength(){
+		return [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpansionLength(),$this.imaginaryPart.getDecimalExpansionLength())
 	}
 
 	# IsStrictlyNegative : returns $true only if the number is strictly negative.
@@ -1095,6 +2937,16 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 	# IsReal : returns $true if the number has no real Part.
 	[bool] IsPureImaginary(){
 		return ($this.realPart.IsNull())
+	}
+
+	# HasRealPart : returns $true if the number has some real Part.
+	[bool] HasRealPart(){
+		return (-not $this.realPart.IsNull())
+	}
+
+	# HasImaginaryPart : returns $true if the number some imaginary Part.
+	[bool] HasImaginaryPart(){
+		return (-not $this.imaginaryPart.IsNull())
 	}
 
 	# IsInteger : returns $true if the number has no decimal expansion.
@@ -1144,7 +2996,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 
 	# CloneWithAdjustedResolution : returns a new instance of BigNum with the maximum resolution set to the current length of the decimal expansion.
 	[BigComplex] CloneWithAdjustedResolution(){
-		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpantionLength(),$this.imaginaryPart.getDecimalExpantionLength())
+		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpansionLength(),$this.imaginaryPart.getDecimalExpansionLength())
 		$tmpAR = $this.realPart.CloneWithNewResolution($newResolution)
 		$tmpBI = $this.imaginaryPart.CloneWithNewResolution($newResolution)
 		return [BigComplex]::new($tmpAR,$tmpBI)
@@ -1157,7 +3009,7 @@ class BigComplex : System.IFormattable, System.IComparable, System.IEquatable[ob
 			throw "Error in [BigComplex]::CloneWithAddedResolution : ${val} must be positive"
 		}
 
-		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpantionLength(),$this.imaginaryPart.getDecimalExpantionLength())
+		$newResolution = [System.Numerics.BigInteger]::Max($this.realPart.getDecimalExpansionLength(),$this.imaginaryPart.getDecimalExpansionLength())
 		$tmpAR = $this.realPart.CloneWithNewResolution($newResolution + $val)
 		$tmpBI = $this.imaginaryPart.CloneWithNewResolution($newResolution + $val)
 		return [BigComplex]::new($tmpAR,$tmpBI)
@@ -2691,6 +4543,11 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 
 	# BigNum : (BigNum) Standard BigNum Constructor.
 	BigNum([BigNum]$newVal) {
+		if ($null -eq $newVal) {
+			$tmpNum = [BigNum]0
+			$newVal = $tmpNum
+		}
+
         $this.Init($newVal.integerVal,$newVal.shiftVal,$newVal.negativeFlag,$newVal.maxDecimalResolution)
     }
 
@@ -2698,6 +4555,18 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 	BigNum([BigFormula]$objFormula) {
 		$newVal = $objFormula.EvaluateR()
         $this.Init($newVal.integerVal,$newVal.shiftVal,$newVal.negativeFlag,$newVal.maxDecimalResolution)
+    }
+
+	# BigNum : (BigMatrix) Standard BigMatrix Constructor, only for rank-1 Matrices with only one element.
+	BigNum([BigMatrix]$objMatrix) {
+		if ($objMatrix.GetRank() -ne 1) {
+			throw "Autocasting Matrix to BigNum only is possible for rank-1 matrices"
+		}
+		if ($objMatrix.GetTotalElements() -ne 1) {
+			throw "Autocasting Matrix to BigNum only is possible for single entry matrices"
+		}
+		$tmp = [BigNum]($objMatrix.Get(0))
+		$this.Init($tmp.integerVal,$tmp.shiftVal,$tmp.negativeFlag,$tmp.maxDecimalResolution)
     }
 
 	# BigNum : (BigNum,BigInteger) BigNum Constructor with custom resolution.
@@ -2883,8 +4752,8 @@ class BigNum : System.IFormattable, System.IComparable, System.IEquatable[object
 		return [System.Numerics.BigInteger]::Parse($this.maxDecimalResolution)
 	}
 
-	# getDecimalExpantionLength : returns the current decimal expansion of the BigNum.
-	[System.Numerics.BigInteger]getDecimalExpantionLength(){
+	# getDecimalExpansionLength : returns the current decimal expansion of the BigNum.
+	[System.Numerics.BigInteger]getDecimalExpansionLength(){
 		return [System.Numerics.BigInteger]::Parse($this.shiftVal)
 	}
 
